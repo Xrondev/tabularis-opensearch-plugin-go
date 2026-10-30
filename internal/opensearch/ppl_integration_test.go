@@ -74,19 +74,34 @@ func TestRealOpenSearchPPL(t *testing.T) {
 			t.Error(err)
 		}
 	})
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
-	defer cancel()
-	operation, err := validator.Validate(ctx, "source="+index+" | fields count | sort count", index, 1)
+	validate := func(text string, pageSize int) (ppl.Query, error) {
+		t.Helper()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		operation, err := validator.Validate(ctx, text, index, pageSize)
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			t.Fatalf("PPL validation did not complete for %q: %v", text, err)
+		}
+		return operation, err
+	}
+	execute := func(operation ppl.Query) json.RawMessage {
+		t.Helper()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		raw, err := client.PPL(ctx, operation)
+		if err != nil {
+			t.Fatalf("PPL request failed for %q: %v", operation.Text(), err)
+		}
+		return raw
+	}
+	operation, err := validate("source="+index+" | fields count | sort count", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.HasSuffix(operation.Text(), " | head 2") {
 		t.Fatal("PPL execution is not bounded")
 	}
-	raw, err := client.PPL(ctx, operation)
-	if err != nil {
-		t.Fatal(err)
-	}
+	raw := execute(operation)
 	result, err := ppl.Normalize(operation, raw)
 	if err != nil {
 		t.Fatal(err)
@@ -95,26 +110,20 @@ func TestRealOpenSearchPPL(t *testing.T) {
 		encoded, _ := json.Marshal(result)
 		t.Fatalf("unexpected PPL result: %s", encoded)
 	}
-	operation, err = validator.Validate(ctx, "source="+index+" | head 1", index, 5)
+	operation, err = validate("source="+index+" | head 1", 5)
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err = client.PPL(ctx, operation)
-	if err != nil {
-		t.Fatal(err)
-	}
+	raw = execute(operation)
 	result, err = ppl.Normalize(operation, raw)
 	if err != nil || len(result.Rows) != 1 || result.Truncated {
 		t.Fatalf("existing PPL head was not preserved: %+v %v", result, err)
 	}
-	operation, err = validator.Validate(ctx, "source="+index+" | where count > 3 | stats count()", index, 10)
+	operation, err = validate("source="+index+" | where count > 3 | stats count()", 10)
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err = client.PPL(ctx, operation)
-	if err != nil {
-		t.Fatal(err)
-	}
+	raw = execute(operation)
 	result, err = ppl.Normalize(operation, raw)
 	if err != nil || len(result.Rows) != 1 || string(result.Rows[0][0]) != "2" {
 		t.Fatalf("PPL filtering and statistics failed: %+v %v", result, err)
@@ -137,11 +146,11 @@ func TestRealOpenSearchPPL(t *testing.T) {
 		"source=" + index + "%2Canother | fields count",
 		"source=another_index | fields count",
 	} {
-		if _, err := validator.Validate(ctx, unsafe, index, 10); err == nil {
+		if _, err := validate(unsafe, 10); err == nil {
 			t.Fatalf("unsafe PPL was accepted: %s", unsafe)
 		}
 	}
-	if _, err := validator.Validate(ctx, "source="+index+" | head from 5", index, 1); err == nil {
+	if _, err := validate("source="+index+" | head from 5", 1); err == nil {
 		t.Fatal("PPL head default size exceeded the page bound")
 	}
 }

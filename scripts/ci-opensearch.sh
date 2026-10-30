@@ -66,4 +66,4 @@ OPENSEARCH_DEEP_TEST_INDEX=tabularis_deep_fixture \
 PPL_TEST_ENDPOINT="$endpoint" \
 PPL_TEST_INDEX=tabularis_fixture \
 PPL_TEST_BUNDLE="$root/ppl/dist/ppl.bundle.js" \
-go test -race ./... -count=1 -timeout=5m
+go test -race -p 1 ./... -count=1 -timeout=5m

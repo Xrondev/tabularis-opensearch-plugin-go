@@ -52,7 +52,12 @@ jobs:
         run: go vet ./...
       - name: Verify formatting
         shell: bash
-        run: test -z "$(find cmd internal -name '*.go' -exec gofmt -l {} +)"
+        run: |
+          unformatted=$(find cmd internal -name '*.go' -exec gofmt -l {} +)
+          if [ -n "$unformatted" ]; then
+            printf 'Go files requiring formatting:\n%s\n' "$unformatted"
+            exit 1
+          fi
       - name: Build executable
         run: go build ./cmd/opensearch-plugin
 
