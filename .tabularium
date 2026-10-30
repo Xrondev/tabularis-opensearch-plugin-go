@@ -7,8 +7,9 @@
   "engine": "opensearch",
   "icon": "https://raw.githubusercontent.com/opensearch-project/project-website/0823cd8d19351def7f000f729b05b6a5f953e5cb/assets/brand/SVG/Mark/opensearch_mark_default.svg",
   "color": "#737373",
+  "license": "Apache-2.0",
   "paradigms": ["document", "search", "vector"],
-  "description": "Browse and query OpenSearch indices from Tabularis.",
+  "description": "Experimental read-only driver for exploring OpenSearch indices from Tabularis.",
   "executable": "opensearch-plugin",
   "connection_fields": {
     "host": { "hidden": true },

@@ -1,0 +1,13 @@
+Tabularis OpenSearch Plugin
+
+Copyright and license notices for dependencies distributed with this software
+are provided in the accompanying licenses directory. The Go dependency notices
+include the Go runtime and standard library, the OpenSearch Go client, the AWS
+SDK for Go, the SQL parser, and the JavaScript runtime used by the PPL parser.
+They also include the Lucent and V8 notices supplied with the JavaScript
+runtime.
+
+The PPL parser artifact contains generated grammar from OpenSearch Dashboards
+and the antlr4ng runtime. Their license and notice files are included in the
+licenses directory. The source revision and generation procedure are recorded
+in ppl/build.sh.

@@ -1,6 +1,6 @@
 # Tabularis OpenSearch Plugin
 
-A Go driver for exploring OpenSearch from Tabularis. The project is under active development; the v0.1.0 specification is not yet fully implemented or validated. See the [specification](docs/specification.md), [implementation plan](docs/implementation-plan.md), and [ticket](docs/tickets/001-opensearch-driver-v0.1.0.md) for scope and acceptance criteria.
+A Go driver for exploring OpenSearch from Tabularis. The planned v0.1.0 release is experimental: the full specification is not yet implemented or validated. See the [compatibility matrix](docs/compatibility.md) for observed tests and unverified environments, and the [specification](docs/specification.md), [implementation plan](docs/implementation-plan.md), and [ticket](docs/tickets/001-opensearch-driver-v0.1.0.md) for intended scope.
 
 The plugin icon uses the official OpenSearch brand mark hosted on GitHub and requires network access to display.
 
@@ -101,7 +101,7 @@ Numbered offset pages do not provide snapshot consistency. Native SQL pages afte
 
 - Add an OpenSearch-specific console as a top-level editor tab, selectable alongside the SQL console from the **+** button, when Tabularis officially supports plugin-provided editor tabs and tab creation.
 - Expand safe pagination, field filtering, and metadata browsing, and add bounded retries.
-- Complete AWS compatibility testing, native platform validation, the compatibility matrix, and third-party notices before release.
+- Expand AWS compatibility testing and native platform validation before making broader support claims.
 
 ## Development
 
@@ -151,20 +151,20 @@ OPENSEARCH_TEST_FIXTURE_INDEX=tabularis_pit_fixture \
 go test -race ./...
 ```
 
-Do not run test setup writes against formal data sources. Read-only metadata checks have passed against a managed domain and a Serverless vector collection. The full AWS compatibility matrix, including SSO credential refresh, multiple accounts and regions, and Serverless search and time-series collections, remains unverified.
+Do not run test setup writes against formal data sources. Read-only metadata checks have passed against a managed domain and a Serverless vector collection. The full AWS compatibility matrix, including SSO credential refresh, multiple accounts and regions, and Serverless search and time-series collections, remains unverified. See the [compatibility matrix](docs/compatibility.md) for the tested operations.
 
 `bash scripts/ci-tabularis-host.sh` exercises the driver through the released Tabularis Web HTTP RPC interface using isolated disposable containers. It does not test the browser UI. See [host-test notes](tests/host/README.md) for the released host's sign-in and PIT cleanup behavior.
 
 ### Snapshot packages
 
-After building the UI, `scripts/package.sh` builds snapshot ZIPs and SHA-256 checksums under `bin/packages/` for Linux amd64/arm64, macOS amd64/arm64, and Windows amd64. These artifacts are not releases and are not automatically published. Cross-compilation does not establish native runtime compatibility.
+After building the UI, `scripts/package.sh` builds ZIPs and SHA-256 checksums under `bin/packages/`. These artifacts are not automatically published. See the [compatibility matrix](docs/compatibility.md) for platform labels and validation; cross-compilation does not establish native runtime compatibility.
 
 ```sh
 bash scripts/package.sh
 bash scripts/smoke-packages.sh
 ```
 
-Release publication requires the specification's compatibility, third-party notice, version and platform-verification gates to be satisfied.
+Before publishing, validate the manifest, archive contents, checksums, and third-party notices. An experimental release must describe the limits of its compatibility evidence.
 
 ## Acknowledgments
 

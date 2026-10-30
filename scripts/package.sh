@@ -8,21 +8,22 @@ test -f ppl/dist/ppl.bundle.js || { echo "Build the PPL parser first: bash ppl/b
 test -d ppl/dist/licenses || { echo "PPL third-party licenses are missing" >&2; exit 1; }
 test -f .tabularium
 test -f locales/en.json
+test -f LICENSE
+test -f NOTICE
 mkdir -p bin/packages
 stage=$(mktemp -d "$root/bin/package.XXXXXXXX")
 trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/ui/dist" "$stage/locales" "$stage/docs/tickets" "$stage/tests/host"
 cp .tabularium README.md "$stage/"
-cp docs/specification.md docs/implementation-plan.md "$stage/docs/"
+cp docs/specification.md docs/implementation-plan.md docs/compatibility.md "$stage/docs/"
 cp docs/tickets/001-opensearch-driver-v0.1.0.md "$stage/docs/tickets/"
 cp tests/host/README.md "$stage/tests/host/"
 cp ui/dist/index.js "$stage/ui/dist/"
 cp ui/dist/raw-source.js "$stage/ui/dist/"
 cp locales/*.json "$stage/locales/"
 cp ppl/dist/ppl.bundle.js "$stage/"
-cp -R ppl/dist/licenses "$stage/"
-if [ -f LICENSE ]; then cp LICENSE "$stage/"; fi
-if [ -f NOTICE ]; then cp NOTICE "$stage/"; fi
+bash scripts/collect-third-party-notices.sh "$stage/licenses"
+cp LICENSE NOTICE "$stage/"
 
 build_package() {
   os=$1
@@ -47,7 +48,11 @@ build_package linux arm64 linux-arm64
 build_package darwin amd64 darwin-x64
 build_package darwin arm64 darwin-arm64
 build_package windows amd64 win-x64
+build_package windows arm64 windows-aarch64
 
-if [ ! -f LICENSE ]; then
-  echo "Snapshot only: LICENSE is not present; publication requires a confirmed license." >&2
+cp .tabularium "$root/bin/packages/default.tabularium"
+if command -v sha256sum >/dev/null 2>&1; then
+  (cd "$root/bin/packages" && sha256sum default.tabularium > default.tabularium.sha256)
+else
+  (cd "$root/bin/packages" && shasum -a 256 default.tabularium > default.tabularium.sha256)
 fi

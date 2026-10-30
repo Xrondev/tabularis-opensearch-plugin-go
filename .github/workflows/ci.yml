@@ -154,4 +154,5 @@ jobs:
           path: |
             bin/packages/*.zip
             bin/packages/*.sha256
+            bin/packages/default.tabularium
           if-no-files-found: error
