@@ -1,7 +1,7 @@
 {
   "id": "opensearch",
   "name": "OpenSearch",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "min_runtime_version": "0.30.0",
   "kind": "driver",
   "engine": "opensearch",

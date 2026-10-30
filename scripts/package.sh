@@ -35,11 +35,7 @@ build_package() {
   archive="$root/bin/packages/opensearch-plugin-$label.zip"
   rm -f "$archive"
   (cd "$stage" && zip -X -q -r "$archive" .)
-  if command -v sha256sum >/dev/null 2>&1; then
-    (cd "$root/bin/packages" && sha256sum "$(basename "$archive")" > "$(basename "$archive").sha256")
-  else
-    (cd "$root/bin/packages" && shasum -a 256 "$(basename "$archive")" > "$(basename "$archive").sha256")
-  fi
+  rm -f "$archive.sha256"
   rm "$stage/$binary"
 }
 
@@ -51,8 +47,13 @@ build_package windows amd64 win-x64
 build_package windows arm64 windows-aarch64
 
 cp .tabularium "$root/bin/packages/default.tabularium"
+rm -f "$root/bin/packages/default.tabularium.sha256"
+assets=(default.tabularium)
+for label in linux-x64 linux-arm64 darwin-x64 darwin-arm64 win-x64 windows-aarch64; do
+  assets+=("opensearch-plugin-$label.zip")
+done
 if command -v sha256sum >/dev/null 2>&1; then
-  (cd "$root/bin/packages" && sha256sum default.tabularium > default.tabularium.sha256)
+  (cd "$root/bin/packages" && sha256sum "${assets[@]}" > SHA256SUMS)
 else
-  (cd "$root/bin/packages" && shasum -a 256 default.tabularium > default.tabularium.sha256)
+  (cd "$root/bin/packages" && shasum -a 256 "${assets[@]}" > SHA256SUMS)
 fi

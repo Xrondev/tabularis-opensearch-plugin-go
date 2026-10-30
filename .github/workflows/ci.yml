@@ -57,10 +57,12 @@ jobs:
           test "${TAG#v}" = "$(jq -er '.version | strings' .tabularium)"
           cmp .tabularium release-assets/default.tabularium
           cd release-assets
-          sha256sum -c default.tabularium.sha256
+          assets=(default.tabularium)
           for platform in linux-x64 linux-arm64 darwin-x64 darwin-arm64 win-x64 windows-aarch64; do
-            sha256sum -c "opensearch-plugin-$platform.zip.sha256"
+            assets+=("opensearch-plugin-$platform.zip")
           done
+          sha256sum "${assets[@]}" | cmp - SHA256SUMS
+          sha256sum -c SHA256SUMS
       - name: Publish experimental release
         shell: bash
         env:
@@ -79,9 +81,9 @@ jobs:
             fi
           }
           check_tag
-          assets=(default.tabularium default.tabularium.sha256)
+          assets=(default.tabularium SHA256SUMS)
           for platform in linux-x64 linux-arm64 darwin-x64 darwin-arm64 win-x64 windows-aarch64; do
-            assets+=("opensearch-plugin-$platform.zip" "opensearch-plugin-$platform.zip.sha256")
+            assets+=("opensearch-plugin-$platform.zip")
           done
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             release_state=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease,assets)
@@ -240,6 +242,6 @@ jobs:
           name: snapshot-packages
           path: |
             bin/packages/*.zip
-            bin/packages/*.sha256
+            bin/packages/SHA256SUMS
             bin/packages/default.tabularium
           if-no-files-found: error

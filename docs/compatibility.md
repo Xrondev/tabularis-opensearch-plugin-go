@@ -1,6 +1,6 @@
 # Experimental compatibility matrix
 
-The planned v0.1.0 release is experimental. A successful test applies only to the operation and environment described here; it does not establish support for every API, deployment configuration, or permission policy. Unverified entries are not test passes.
+The v0.1.1 release is experimental. A successful test applies only to the operation and environment described here; it does not establish support for every API, deployment configuration, or permission policy. Unverified entries are not test passes.
 
 ## Backend and host evidence
 
@@ -34,7 +34,7 @@ ZIP archives contain the driver, manifest, PPL parser artifact, UI bundles, docu
 
 ## Experimental release assets
 
-Release preparation produces platform ZIPs and SHA-256 checksum files, plus a standalone `default.tabularium` manifest and its checksum. A pushed `vX.Y.Z` tag must match the manifest version after removing the leading `v`. After all required CI jobs pass, the workflow publishes the verified assets as a GitHub prerelease. Running packaging locally does not publish a release. See the [Tabularis plugin publishing guide](https://github.com/TabularisDB/tabularis/blob/main/plugins/PLUGIN_GUIDE.md#8-publishing-your-plugin).
+Release preparation produces platform ZIPs, a standalone `default.tabularium` manifest, and a consolidated `SHA256SUMS` file. A pushed `vX.Y.Z` tag must match the manifest version after removing the leading `v`. After all required CI jobs pass, the workflow publishes the verified assets as a GitHub prerelease. Running packaging locally does not publish a release. See the [Tabularis plugin publishing guide](https://github.com/TabularisDB/tabularis/blob/main/plugins/PLUGIN_GUIDE.md#8-publishing-your-plugin).
 
 ## Known operation limits
 

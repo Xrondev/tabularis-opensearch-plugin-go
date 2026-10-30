@@ -1,6 +1,6 @@
 # Tabularis OpenSearch Plugin
 
-A Go driver for exploring OpenSearch from Tabularis. The planned v0.1.0 release is experimental: the full specification is not yet implemented or validated. See the [compatibility matrix](docs/compatibility.md) for observed tests and unverified environments, and the [specification](docs/specification.md), [implementation plan](docs/implementation-plan.md), and [ticket](docs/tickets/001-opensearch-driver-v0.1.0.md) for intended scope.
+A Go driver for exploring OpenSearch from Tabularis. The v0.1.1 release is experimental: the full specification is not yet implemented or validated. See the [compatibility matrix](docs/compatibility.md) for observed tests and unverified environments, and the [specification](docs/specification.md), [implementation plan](docs/implementation-plan.md), and [ticket](docs/tickets/001-opensearch-driver-v0.1.0.md) for intended scope.
 
 The plugin icon uses the official OpenSearch brand mark hosted on GitHub and requires network access to display.
 
@@ -16,7 +16,7 @@ See [Limitations](#limitations) for query, pagination, and deployment restrictio
 
 ## Installation
 
-The plugin targets Tabularis 0.30.0 or later. No public release or registry installation is available yet. Build a snapshot package as described in [Snapshot packages](#snapshot-packages), then install the ZIP matching your operating system and architecture:
+The plugin targets Tabularis 0.30.0 or later. Download the ZIP matching your operating system and architecture from [GitHub Releases](https://github.com/Xrondev/tabularis-opensearch-plugin-go/releases), or build a snapshot package as described in [Snapshot packages](#snapshot-packages):
 
 1. In Tabularis, open **Settings → Plugins → Open plugins folder**.
 2. Extract the ZIP into `drivers/opensearch` under that folder. Keep `.tabularium`, the executable, `ppl.bundle.js`, `ui`, `locales`, and license files together.
@@ -157,7 +157,7 @@ Do not run test setup writes against formal data sources. Read-only metadata che
 
 ### Snapshot packages
 
-After building the UI, `scripts/package.sh` builds ZIPs and SHA-256 checksums under `bin/packages/`. These artifacts are not automatically published. See the [compatibility matrix](docs/compatibility.md) for platform labels and validation; cross-compilation does not establish native runtime compatibility.
+After building the UI, `scripts/package.sh` builds platform ZIPs, a standalone manifest, and a consolidated `SHA256SUMS` file under `bin/packages/`. These artifacts are not automatically published. See the [compatibility matrix](docs/compatibility.md) for platform labels and validation; cross-compilation does not establish native runtime compatibility.
 
 ```sh
 bash scripts/package.sh
@@ -168,7 +168,7 @@ Before publishing, validate the manifest, archive contents, checksums, and third
 
 ### Automated experimental releases
 
-Push a new version tag in the form `vX.Y.Z` that matches the version in `.tabularium`. CI runs the test and packaging jobs, then publishes the checked ZIPs, checksums, and standalone manifest as a GitHub prerelease only if all required jobs pass. Each tag has its own release; publishing a later version does not replace earlier releases. Pushing a branch or opening a pull request does not publish a release. The repository's visibility controls who can access the release assets.
+Push a new version tag in the form `vX.Y.Z` that matches the version in `.tabularium`. CI runs the test and packaging jobs, then publishes the checked ZIPs, `SHA256SUMS`, and standalone manifest as a GitHub prerelease only if all required jobs pass. Each tag has its own release; publishing a later version does not replace earlier releases. Pushing a branch or opening a pull request does not publish a release. The repository's visibility controls who can access the release assets.
 
 ## Acknowledgments
 

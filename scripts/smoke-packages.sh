@@ -3,21 +3,23 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root/bin/packages"
 
+assets=(default.tabularium)
+for label in linux-x64 linux-arm64 darwin-x64 darwin-arm64 win-x64 windows-aarch64; do
+  assets+=("opensearch-plugin-$label.zip")
+done
 if command -v sha256sum >/dev/null 2>&1; then
-  sha256sum -c default.tabularium.sha256
+  sha256sum "${assets[@]}" | cmp - SHA256SUMS
+  sha256sum -c SHA256SUMS
 else
-  shasum -a 256 -c default.tabularium.sha256
+  shasum -a 256 "${assets[@]}" | cmp - SHA256SUMS
+  shasum -a 256 -c SHA256SUMS
 fi
 cmp default.tabularium "$root/.tabularium"
+bash "$root/scripts/check-registry-assets.sh" "$root/bin/packages"
 
 for label in linux-x64 linux-arm64 darwin-x64 darwin-arm64 win-x64 windows-aarch64; do
   archive="opensearch-plugin-$label.zip"
   test -f "$archive"
-  if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum -c "$archive.sha256"
-  else
-    shasum -a 256 -c "$archive.sha256"
-  fi
   unzip -tq "$archive"
   unzip -p "$archive" .tabularium | jq -e '.id == "opensearch" and .capabilities.readonly == true and .license == "Apache-2.0" and .color == "#737373" and .icon == "https://raw.githubusercontent.com/opensearch-project/project-website/0823cd8d19351def7f000f729b05b6a5f953e5cb/assets/brand/SVG/Mark/opensearch_mark_default.svg"' >/dev/null
   unzip -p "$archive" ui/dist/index.js >/dev/null
