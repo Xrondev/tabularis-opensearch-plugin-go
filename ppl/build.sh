@@ -18,7 +18,9 @@ test "$(git -C "$cache" rev-parse HEAD)" = "$commit"
 printf '%s  %s\n' \
   71e048d2d06f9697fbca640d2b3ae9e7b994e1e0cd0178e324a6071a3590f2be "$grammar/OpenSearchPPLLexer.ts" \
   b842c353a6f01ac53a51c9b7ce996aec91c026761bc2a4493945948e78d5941f "$grammar/OpenSearchPPLParser.ts" \
-  14241f4e0810a41e9f2cacfd040b10b9de836f01b1221fde27de78f8d4cdabe6 "$grammar/OpenSearchPPLParserVisitor.ts" | shasum -a 256 -c
+  14241f4e0810a41e9f2cacfd040b10b9de836f01b1221fde27de78f8d4cdabe6 "$grammar/OpenSearchPPLParserVisitor.ts" \
+  cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30 "$cache/LICENSE.txt" \
+  5989381456476560bf1527f9cad85135e3ff8f8aba92f276d88708ff9f06b7a9 "$cache/NOTICE.txt" | shasum -a 256 -c
 
 npm ci --prefix "$root/ppl" --no-audit --no-fund
 mkdir -p "$root/ppl/dist/licenses"

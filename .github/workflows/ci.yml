@@ -11,10 +11,27 @@ permissions:
   contents: read
 
 jobs:
-  ppl-parser:
+  secrets-scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.10'
+          cache: true
+      - name: Scan Git history for secrets
+        run: go run github.com/zricethezav/gitleaks/v8@v8.30.1 git --no-banner --redact --log-opts=--all .
+
+  ppl-parser:
+    needs: secrets-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26.10'
@@ -23,6 +40,8 @@ jobs:
         with:
           node-version: 24
       - run: bash ppl/build.sh
+      - name: Scan PPL artifact for secrets
+        run: bash scripts/scan-release-artifacts.sh ppl ppl/dist/ppl.bundle.js
       - uses: actions/upload-artifact@v4
         with:
           name: ppl-parser
@@ -125,6 +144,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26.10'
@@ -154,6 +175,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -174,6 +197,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26.10'
@@ -188,6 +213,8 @@ jobs:
         opensearch: ["2.19.3", "3.3.2"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26.10'
@@ -202,6 +229,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26.10'
@@ -218,9 +247,12 @@ jobs:
       - run: bash scripts/ci-tabularis-host.sh
 
   snapshot-packages:
+    needs: secrets-scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26.10'
@@ -237,11 +269,20 @@ jobs:
       - run: bash ppl/build.sh
       - run: bash scripts/package.sh
       - run: bash scripts/smoke-packages.sh
+      - name: Scan release artifacts for secrets
+        run: bash scripts/scan-release-artifacts.sh packages bin/packages
+      - name: Verify artifact security failure paths
+        run: bash scripts/test-artifact-guard.sh
       - uses: actions/upload-artifact@v4
         with:
           name: snapshot-packages
           path: |
-            bin/packages/*.zip
+            bin/packages/opensearch-plugin-linux-x64.zip
+            bin/packages/opensearch-plugin-linux-arm64.zip
+            bin/packages/opensearch-plugin-darwin-x64.zip
+            bin/packages/opensearch-plugin-darwin-arm64.zip
+            bin/packages/opensearch-plugin-win-x64.zip
+            bin/packages/opensearch-plugin-windows-aarch64.zip
             bin/packages/SHA256SUMS
             bin/packages/default.tabularium
           if-no-files-found: error

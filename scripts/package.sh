@@ -20,7 +20,11 @@ cp docs/tickets/001-opensearch-driver-v0.1.0.md "$stage/docs/tickets/"
 cp tests/host/README.md "$stage/tests/host/"
 cp ui/dist/index.js "$stage/ui/dist/"
 cp ui/dist/raw-source.js "$stage/ui/dist/"
-cp locales/*.json "$stage/locales/"
+while IFS= read -r -d '' locale; do
+  [[ "$locale" =~ ^locales/[A-Za-z0-9_-]+\.json$ ]] || { echo "Invalid tracked locale name" >&2; exit 1; }
+  test -f "$locale" && test ! -L "$locale" || { echo "Invalid tracked locale file" >&2; exit 1; }
+  cp "$locale" "$stage/locales/"
+done < <(git ls-files -z -- 'locales/*.json')
 cp ppl/dist/ppl.bundle.js "$stage/"
 bash scripts/collect-third-party-notices.sh "$stage/licenses"
 cp LICENSE NOTICE "$stage/"
