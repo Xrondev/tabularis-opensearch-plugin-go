@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"tabularis-opensearch-plugin-go/internal/awsdiscovery"
 	"tabularis-opensearch-plugin-go/internal/browse"
 	"tabularis-opensearch-plugin-go/internal/connection"
 	"tabularis-opensearch-plugin-go/internal/connectioncache"
@@ -312,25 +311,6 @@ func dispatch(ctx context.Context, cache *connectioncache.Cache, pages *paginati
 	switch req.Method {
 	case "initialize":
 		resp.Result = map[string]any{}
-	case "discover_aws_endpoints":
-		var options awsdiscovery.Options
-		if err := json.Unmarshal(req.Params, &options); err != nil {
-			resp.Error = &rpcError{Code: -32602, Message: "Invalid discovery parameters"}
-			return
-		}
-		discoveryCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-		result, err := awsdiscovery.Discover(discoveryCtx, options)
-		if err != nil {
-			code := -32603
-			var discoveryErr *awsdiscovery.Error
-			if errors.As(err, &discoveryErr) && discoveryErr.Kind == "invalid_configuration" {
-				code = -32602
-			}
-			resp.Error = &rpcError{Code: code, Message: err.Error()}
-		} else {
-			resp.Result = result
-		}
 	case "get_databases":
 		resp.Result = []string{"default"}
 	case "get_schemas", "get_foreign_keys", "get_indexes", "get_views", "get_routines":

@@ -41,20 +41,6 @@ func TestStdioMethods(t *testing.T) {
 	}
 }
 
-func TestDiscoveryRejectsInvalidConfiguration(t *testing.T) {
-	input := bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"discover_aws_endpoints","params":{"deployment":"self_hosted","region":"us-east-1","profile":"default"}}` + "\n")
-	var output bytes.Buffer
-	if err := serve(input, &output); err != nil {
-		t.Fatal(err)
-	}
-	var response struct {
-		Error rpcError `json:"error"`
-	}
-	if err := json.Unmarshal(output.Bytes(), &response); err != nil || response.Error.Code != -32602 {
-		t.Fatalf("expected invalid parameters: %s", output.String())
-	}
-}
-
 func TestInvalidVerifiedFieldIsRejectedBeforeConnection(t *testing.T) {
 	input := bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"test_connection","params":{"params":{"extra":{"endpoint":"http://127.0.0.1:1","deployment":"self_hosted","auth_mode":"anonymous","verified_exact_fields":"nested.field"}}}}` + "\n")
 	var output bytes.Buffer
