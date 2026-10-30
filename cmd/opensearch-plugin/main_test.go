@@ -41,6 +41,124 @@ func TestStdioMethods(t *testing.T) {
 	}
 }
 
+func TestInvalidVerifiedFieldIsRejectedBeforeConnection(t *testing.T) {
+	input := bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"test_connection","params":{"params":{"extra":{"endpoint":"http://127.0.0.1:1","deployment":"self_hosted","auth_mode":"anonymous","verified_exact_fields":"nested.field"}}}}` + "\n")
+	var output bytes.Buffer
+	if err := serve(input, &output); err != nil {
+		t.Fatal(err)
+	}
+	var response struct {
+		Error rpcError `json:"error"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Error.Code != -32602 {
+		t.Fatalf("expected invalid configuration, got %s", output.String())
+	}
+}
+
+func TestUnsupportedBrowsePredicateDoesNotFetchMapping(t *testing.T) {
+	input := bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"execute_query","params":{"params":{"extra":{"endpoint":"http://127.0.0.1:1","deployment":"self_hosted","auth_mode":"anonymous","verified_exact_fields":"count"}},"query":"SELECT * FROM \"events\" WHERE 3 = \"_source.count\"","limit":10,"page":1}}` + "\n")
+	var output bytes.Buffer
+	if err := serve(input, &output); err != nil {
+		t.Fatal(err)
+	}
+	var response struct {
+		Error rpcError `json:"error"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Error.Code != -32602 {
+		t.Fatalf("expected unsupported predicate error, got %s", output.String())
+	}
+}
+
+func TestInvalidBrowseExpressionsDoNotContactServer(t *testing.T) {
+	queries := []string{
+		`SELECT * FROM "events" WHERE "_source.count" IS TRUE`,
+		`SELECT * FROM "events" WHERE "_source.count" = 3 AND "_source.count" IS TRUE`,
+		`SELECT * FROM "events" WHERE "_source.count" = 3 ORDER BY "_source.count" + 1`,
+	}
+	for _, query := range queries {
+		t.Run(query, func(t *testing.T) {
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer listener.Close()
+			connected := make(chan struct{}, 1)
+			release := make(chan struct{})
+			defer close(release)
+			go func() {
+				conn, err := listener.Accept()
+				if err == nil {
+					connected <- struct{}{}
+					<-release
+					conn.Close()
+				}
+			}()
+			request, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "execute_query", "params": map[string]any{"params": map[string]any{"extra": map[string]string{"endpoint": "http://" + listener.Addr().String(), "deployment": "self_hosted", "auth_mode": "anonymous", "verified_exact_fields": "count", "request_timeout_ms": "1000"}}, "query": query, "limit": 10, "page": 1}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var output bytes.Buffer
+			if err := serve(bytes.NewReader(append(request, '\n')), &output); err != nil {
+				t.Fatal(err)
+			}
+			var response struct {
+				Error rpcError `json:"error"`
+			}
+			if err := json.Unmarshal(output.Bytes(), &response); err != nil {
+				t.Fatal(err)
+			}
+			if response.Error.Code != -32602 {
+				t.Fatalf("expected invalid query: %s", output.String())
+			}
+			select {
+			case <-connected:
+				t.Fatal("invalid query contacted server")
+			default:
+			}
+		})
+	}
+}
+
+func TestVerifiedFieldsRejectWildcardBeforeConnection(t *testing.T) {
+	input := bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"execute_query","params":{"params":{"extra":{"endpoint":"http://127.0.0.1:1","deployment":"self_hosted","auth_mode":"anonymous","index_pattern":"events*","verified_exact_fields":"count"}},"query":"SELECT * FROM \"events*\" WHERE \"_source.count\" = 3","limit":10,"page":1}}` + "\n")
+	var output bytes.Buffer
+	if err := serve(input, &output); err != nil {
+		t.Fatal(err)
+	}
+	var response struct {
+		Error rpcError `json:"error"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Error.Code != -32602 || !strings.Contains(response.Error.Message, "concrete index") {
+		t.Fatalf("expected concrete-index validation, got %s", output.String())
+	}
+}
+
+func TestUnverifiedBrowseFieldDoesNotFetchMapping(t *testing.T) {
+	input := bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"execute_query","params":{"params":{"extra":{"endpoint":"http://127.0.0.1:1","deployment":"self_hosted","auth_mode":"anonymous","verified_exact_fields":"count"}},"query":"SELECT * FROM \"events\" WHERE \"_source.other\" = 3","limit":10,"page":1}}` + "\n")
+	var output bytes.Buffer
+	if err := serve(input, &output); err != nil {
+		t.Fatal(err)
+	}
+	var response struct {
+		Error rpcError `json:"error"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Error.Code != -32602 || !strings.Contains(response.Error.Message, "verified") {
+		t.Fatalf("expected field verification error, got %s", output.String())
+	}
+}
+
 func TestExecutableCancelsInFlightRequest(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

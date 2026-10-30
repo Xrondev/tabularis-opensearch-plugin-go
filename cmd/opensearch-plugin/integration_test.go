@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 )
 
@@ -43,6 +44,52 @@ func TestExecutableConnectsToOpenSearch(t *testing.T) {
 	}
 	if !response.Result.Success {
 		t.Fatalf("connection failed: %s", output)
+	}
+}
+
+func TestExecutableVerifiedNullFilters(t *testing.T) {
+	endpoint, index := os.Getenv("OPENSEARCH_TEST_ENDPOINT"), os.Getenv("OPENSEARCH_NULL_TEST_INDEX")
+	if endpoint == "" || index == "" {
+		t.Skip("null-filter fixture is not configured")
+	}
+	for _, tc := range []struct {
+		predicate string
+		ids       map[string]bool
+	}{
+		{`"_source.count" IS NULL`, map[string]bool{"2": true, "3": true}},
+		{`"_source.count" IS NOT NULL`, map[string]bool{"1": true}},
+	} {
+		t.Run(tc.predicate, func(t *testing.T) {
+			request := map[string]any{"jsonrpc": "2.0", "id": 1, "method": "execute_query", "params": map[string]any{"params": map[string]any{"extra": map[string]string{"endpoint": endpoint, "deployment": "self_hosted", "auth_mode": "anonymous", "index_pattern": index, "verified_exact_fields": "count"}}, "query": "SELECT * FROM \"" + index + "\" WHERE " + tc.predicate, "limit": 10, "page": 1}}
+			input, err := json.Marshal(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.Command("go", "run", ".")
+			cmd.Stdin = bytes.NewReader(append(input, '\n'))
+			output, err := cmd.Output()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var response struct {
+				Result struct {
+					Rows [][]json.RawMessage `json:"rows"`
+				} `json:"result"`
+				Error json.RawMessage `json:"error"`
+			}
+			if err := json.Unmarshal(output, &response); err != nil || len(response.Error) != 0 {
+				t.Fatalf("query failed: %s %v", output, err)
+			}
+			if len(response.Result.Rows) != len(tc.ids) {
+				t.Fatalf("unexpected rows: %s", output)
+			}
+			for _, row := range response.Result.Rows {
+				var id string
+				if len(row) < 2 || json.Unmarshal(row[1], &id) != nil || !tc.ids[id] {
+					t.Fatalf("unexpected row: %s", output)
+				}
+			}
+		})
 	}
 }
 
@@ -318,5 +365,114 @@ func TestExecutableOpensIndex(t *testing.T) {
 	}
 	if len(response.Error) != 0 || len(response.Result.Rows) == 0 || len(response.Result.Columns) < 4 || response.Result.Columns[0] != "_index" || response.Result.Columns[1] != "_id" || response.Result.Columns[3] != "_source" {
 		t.Fatalf("index browsing failed: %s", output)
+	}
+}
+
+func TestExecutableFiltersVerifiedGridField(t *testing.T) {
+	endpoint := os.Getenv("OPENSEARCH_TEST_ENDPOINT")
+	index := os.Getenv("OPENSEARCH_TEST_INDEX")
+	if endpoint == "" || index == "" {
+		t.Skip("OPENSEARCH_TEST_ENDPOINT and OPENSEARCH_TEST_INDEX are required")
+	}
+	request := map[string]any{
+		"jsonrpc": "2.0", "id": 15, "method": "execute_query",
+		"params": map[string]any{
+			"params": map[string]any{"extra": map[string]string{
+				"endpoint": endpoint, "deployment": "self_hosted", "auth_mode": "anonymous",
+				"index_pattern": index, "verified_exact_fields": "count",
+			}},
+			"query": "SELECT * FROM \"" + index + "\" WHERE \"_source.count\" >= 4 ORDER BY \"_source.count\" DESC", "limit": 10, "page": 1,
+		},
+	}
+	data, err := json.Marshal(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("go", "run", ".")
+	cmd.Stdin = bytes.NewReader(append(data, '\n'))
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var response struct {
+		Result struct {
+			Rows [][]json.RawMessage `json:"rows"`
+		} `json:"result"`
+		Error json.RawMessage `json:"error"`
+	}
+	if err := json.Unmarshal(output, &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Error) != 0 || len(response.Result.Rows) != 2 || string(response.Result.Rows[0][1]) != `"3"` || string(response.Result.Rows[1][1]) != `"2"` {
+		t.Fatalf("filtered grid query failed: %s", output)
+	}
+	params := request["params"].(map[string]any)
+	connection := params["params"].(map[string]any)
+	extra := connection["extra"].(map[string]string)
+	delete(extra, "verified_exact_fields")
+	data, err = json.Marshal(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd = exec.Command("go", "run", ".")
+	cmd.Stdin = bytes.NewReader(append(data, '\n'))
+	output, err = cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rejected struct {
+		Error rpcError `json:"error"`
+	}
+	if err := json.Unmarshal(output, &rejected); err != nil || rejected.Error.Code != -32602 {
+		t.Fatalf("unverified field was not rejected: %s", output)
+	}
+	extra["verified_exact_fields"] = "message"
+	params["query"] = "SELECT * FROM \"" + index + "\" WHERE \"_source.message\" = 'hello'"
+	data, err = json.Marshal(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd = exec.Command("go", "run", ".")
+	cmd.Stdin = bytes.NewReader(append(data, '\n'))
+	output, err = cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(output, &rejected); err != nil || rejected.Error.Code != -32602 || !strings.Contains(rejected.Error.Message, "does not support") {
+		t.Fatalf("unsupported text field was not rejected: %s", output)
+	}
+}
+
+func TestExecutableRejectsAliasForVerifiedField(t *testing.T) {
+	endpoint := os.Getenv("OPENSEARCH_TEST_ENDPOINT")
+	alias := os.Getenv("OPENSEARCH_TEST_ALIAS")
+	if endpoint == "" || alias == "" {
+		t.Skip("OPENSEARCH_TEST_ENDPOINT and OPENSEARCH_TEST_ALIAS are required")
+	}
+	request := map[string]any{
+		"jsonrpc": "2.0", "id": 16, "method": "execute_query",
+		"params": map[string]any{
+			"params": map[string]any{"extra": map[string]string{
+				"endpoint": endpoint, "deployment": "self_hosted", "auth_mode": "anonymous",
+				"index_pattern": "*", "verified_exact_fields": "count",
+			}},
+			"query": "SELECT * FROM \"" + alias + "\" WHERE \"_source.count\" = 3", "limit": 10, "page": 1,
+		},
+	}
+	data, err := json.Marshal(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("go", "run", ".")
+	cmd.Stdin = bytes.NewReader(append(data, '\n'))
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var response struct {
+		Error rpcError `json:"error"`
+	}
+	if err := json.Unmarshal(output, &response); err != nil || !strings.Contains(response.Error.Message, "concrete index") {
+		t.Fatalf("verified alias was not rejected: %s", output)
 	}
 }

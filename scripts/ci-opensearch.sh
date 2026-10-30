@@ -1,6 +1,8 @@
 set -euo pipefail
 
 version=${1:?OpenSearch image version is required}
+root=$(cd "$(dirname "$0")/.." && pwd)
+test -f "$root/ppl/dist/ppl.bundle.js" || bash "$root/ppl/build.sh"
 case "$version" in
   2.19.3|3.3.2) ;;
   *) echo "Unsupported test image: $version" >&2; exit 1 ;;
@@ -33,6 +35,13 @@ curl -fsS -X PUT "$endpoint/tabularis_fixture/_doc/2?refresh=true" \
   -H 'Content-Type: application/json' -d '{"message":"two","count":4}' >/dev/null
 curl -fsS -X PUT "$endpoint/tabularis_fixture/_doc/3?refresh=true" \
   -H 'Content-Type: application/json' -d '{"message":"three","count":5}' >/dev/null
+curl -fsS -X PUT "$endpoint/tabularis_fixture/_alias/tabularis_fixture_alias" >/dev/null
+curl -fsS -X PUT "$endpoint/tabularis_null_fixture/_doc/1?refresh=true" \
+  -H 'Content-Type: application/json' -d '{"count":1}' >/dev/null
+curl -fsS -X PUT "$endpoint/tabularis_null_fixture/_doc/2?refresh=true" \
+  -H 'Content-Type: application/json' -d '{"count":null}' >/dev/null
+curl -fsS -X PUT "$endpoint/tabularis_null_fixture/_doc/3?refresh=true" \
+  -H 'Content-Type: application/json' -d '{"other":true}' >/dev/null
 for count in 3 4 5; do
   curl -fsS -X PUT "$endpoint/tabularis_pit_fixture/_doc/$count?refresh=true" \
     -H 'Content-Type: application/json' -d "{\"count\":$count,\"message\":\"hello\"}" >/dev/null
@@ -50,6 +59,11 @@ curl -fsS -X PUT "$endpoint/tabularis_deep_fixture" \
 
 OPENSEARCH_TEST_ENDPOINT="$endpoint" \
 OPENSEARCH_TEST_INDEX=tabularis_fixture \
+OPENSEARCH_TEST_ALIAS=tabularis_fixture_alias \
+OPENSEARCH_NULL_TEST_INDEX=tabularis_null_fixture \
 OPENSEARCH_TEST_FIXTURE_INDEX=tabularis_pit_fixture \
 OPENSEARCH_DEEP_TEST_INDEX=tabularis_deep_fixture \
+PPL_TEST_ENDPOINT="$endpoint" \
+PPL_TEST_INDEX=tabularis_fixture \
+PPL_TEST_BUNDLE="$root/ppl/dist/ppl.bundle.js" \
 go test -race ./... -count=1 -timeout=5m

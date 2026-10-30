@@ -54,6 +54,7 @@ Plugin-owned non-secret keys in the host's `extra` string map:
 | `request_timeout_ms` | Decimal integer; default 30000, permitted 1000–300000. |
 | `page_size` | Decimal integer; default 100, permitted 1–1000. |
 | `pagination_mode` | `offset` (default) or `pit`; PIT uses a verified single-concrete-index, one-primary-shard search and can require additional permissions and server memory. |
+| `verified_exact_fields` | Optional comma-separated, unique top-level field names. The user attests that each field is single-valued, has no `null_value` or normalizer, and has equivalent SQL/DSL filtering and sorting semantics. Every non-null value must be visible to `exists`, including values affected by `ignore_above`, `ignore_malformed`, and indexing settings. Applies only to a concrete index; unsupported or ambiguous mappings are rejected. Requires index resolution and settings permissions. UUID checks bracket the mapping and search; index identity and mappings must remain stable during queries, since concurrent changes cannot always be detected. |
 
 Secret keys delivered through `params.extra` after host resolution: `aws_access_key_id`, `aws_secret_access_key`, `aws_session_token`. Basic authentication uses native `username`/`password`. Custom CA uses native `ssl_ca`; its path/content representation must match the selected host and be frozen by gate G1. The driver does not invent a second secret store. [Host connection model](https://github.com/TabularisDB/tabularis/blob/92820f0df1fc5ff826ec03bec5a8119ae1d73c14/src-tauri/src/models.rs#L186-L313)
 

@@ -75,7 +75,7 @@ func ValidatePage(text, indexPattern string, pageSize, page int) (Query, error) 
 			expressions.KindStar, expressions.KindAlias, expressions.KindNull, expressions.KindBoolean,
 			expressions.KindParen, expressions.KindEQ, expressions.KindNEQ, expressions.KindGT,
 			expressions.KindGTE, expressions.KindLT, expressions.KindLTE, expressions.KindAnd,
-			expressions.KindOr, expressions.KindIn, expressions.KindIs, expressions.KindFrom,
+			expressions.KindOr, expressions.KindIn, expressions.KindIs, expressions.KindNot, expressions.KindFrom,
 			expressions.KindWhere, expressions.KindGroup, expressions.KindOrder, expressions.KindLimit,
 			expressions.KindHaving, expressions.KindOrdered, expressions.KindCount, expressions.KindAvg,
 			expressions.KindSum, expressions.KindMin, expressions.KindMax:

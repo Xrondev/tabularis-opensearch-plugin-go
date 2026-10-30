@@ -185,15 +185,15 @@ func (c *Client) pitRequest(ctx context.Context, method, endpoint string, values
 	}
 	response, err := c.client.Transport.Stream(request)
 	if err != nil {
-		return nil, fmt.Errorf("PIT network request failed: %w", err)
+		return nil, transportFailure(ctx, err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf("PIT request failed with HTTP status %d", response.StatusCode)
+		return nil, httpFailure(response.StatusCode)
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("read PIT response: %w", err)
+		return nil, transportFailure(ctx, err)
 	}
 	if len(data) > maxResponseBytes || !json.Valid(data) {
 		return nil, errors.New("PIT response is invalid or exceeds the size limit")

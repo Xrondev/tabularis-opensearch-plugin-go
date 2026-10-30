@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"tabularis-opensearch-plugin-go/internal/connection"
 	"tabularis-opensearch-plugin-go/internal/connectioncache"
 	"tabularis-opensearch-plugin-go/internal/pagination"
+	"tabularis-opensearch-plugin-go/internal/ppl"
 	"tabularis-opensearch-plugin-go/internal/query"
 	"tabularis-opensearch-plugin-go/internal/sqlquery"
 )
@@ -34,6 +36,47 @@ type rpcError struct {
 
 var errInvalidParams = errors.New("invalid parameters")
 
+type pplRuntime struct {
+	once      sync.Once
+	mu        sync.Mutex
+	validator *ppl.Validator
+	err       error
+	closed    bool
+}
+
+func (r *pplRuntime) get() (*ppl.Validator, error) {
+	r.once.Do(func() {
+		executable, err := os.Executable()
+		var validator *ppl.Validator
+		if err == nil {
+			validator, err = ppl.Open(filepath.Join(filepath.Dir(executable), "ppl.bundle.js"))
+		}
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		if r.closed && validator != nil {
+			err = errors.Join(err, validator.Close())
+			validator = nil
+		}
+		r.validator, r.err = validator, err
+	})
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed {
+		return nil, errors.New("PPL validator is closed")
+	}
+	return r.validator, r.err
+}
+
+func (r *pplRuntime) close() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.closed = true
+	if r.validator != nil {
+		return r.validator.Close()
+	}
+	return nil
+}
+
 type response struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      json.RawMessage `json:"id"`
@@ -47,6 +90,8 @@ func serve(input io.Reader, output io.Writer) (err error) {
 		return err
 	}
 	defer func() { err = errors.Join(err, cache.Close()) }()
+	pplRuntime := &pplRuntime{}
+	defer func() { err = errors.Join(err, pplRuntime.close()) }()
 	pages, err := pagination.New(func(error) { fmt.Fprintln(os.Stderr, "PIT cleanup failed") })
 	if err != nil {
 		return err
@@ -241,7 +286,7 @@ func serve(input io.Reader, output io.Writer) (err error) {
 					write(resp)
 					return
 				}
-				dispatch(ctx, cache, pages, req, &resp)
+				dispatch(ctx, cache, pages, pplRuntime, req, &resp)
 				write(resp)
 			}(req, resp)
 			continue
@@ -262,7 +307,7 @@ func validID(id json.RawMessage) bool {
 	return json.Unmarshal(id, &number) == nil && len(id) > 0 && id[0] != '"'
 }
 
-func dispatch(ctx context.Context, cache *connectioncache.Cache, pages *pagination.Manager, req request, resp *response) {
+func dispatch(ctx context.Context, cache *connectioncache.Cache, pages *pagination.Manager, pplRuntime *pplRuntime, req request, resp *response) {
 	switch req.Method {
 	case "initialize":
 		resp.Result = map[string]any{}
@@ -282,7 +327,7 @@ func dispatch(ctx context.Context, cache *connectioncache.Cache, pages *paginati
 			resp.Result = json.RawMessage("null")
 		}
 	case "test_connection", "ping", "get_tables", "get_columns", "execute_query":
-		result, err := handleConnection(ctx, cache, pages, req.Method, req.Params)
+		result, err := handleConnection(ctx, cache, pages, pplRuntime, req.Method, req.Params)
 		if err != nil {
 			code := -32603
 			if errors.Is(err, errInvalidParams) {
@@ -299,7 +344,7 @@ func dispatch(ctx context.Context, cache *connectioncache.Cache, pages *paginati
 	}
 }
 
-func handleConnection(parent context.Context, cache *connectioncache.Cache, pages *pagination.Manager, method string, raw json.RawMessage) (result any, err error) {
+func handleConnection(parent context.Context, cache *connectioncache.Cache, pages *pagination.Manager, pplRuntime *pplRuntime, method string, raw json.RawMessage) (result any, err error) {
 	var args struct {
 		Params    connection.Params `json:"params"`
 		Table     string            `json:"table"`
@@ -320,8 +365,12 @@ func handleConnection(parent context.Context, cache *connectioncache.Cache, page
 	defer cancel()
 	var operation query.Request
 	var sqlOperation sqlquery.Query
+	var pplOperation ppl.Query
 	sqlMode := false
+	pplMode := false
 	browseMode := false
+	var browsePlan browse.Plan
+	var browsePlanErr error
 	pageSize := cfg.PageSize
 	if method == "execute_query" {
 		if args.Schema != nil && *args.Schema != "" {
@@ -338,6 +387,16 @@ func handleConnection(parent context.Context, cache *connectioncache.Cache, page
 		if strings.TrimSpace(mode) == "#!sql" && hasBody {
 			sqlMode = true
 			sqlOperation, err = sqlquery.ValidatePage(body, cfg.IndexPattern, pageSize, args.Page)
+		} else if strings.TrimSpace(mode) == "#!ppl" && hasBody {
+			if args.Page != 1 {
+				return nil, fmt.Errorf("%w: PPL pagination is not supported", errInvalidParams)
+			}
+			validator, openErr := pplRuntime.get()
+			if openErr != nil {
+				return nil, openErr
+			}
+			pplMode = true
+			pplOperation, err = validator.Validate(ctx, body, cfg.IndexPattern, pageSize)
 		} else if !strings.HasPrefix(text, "#!") {
 			browseMode, err = browse.Candidate(text)
 			if err != nil {
@@ -359,6 +418,25 @@ func handleConnection(parent context.Context, cache *connectioncache.Cache, page
 		if err != nil {
 			return nil, fmt.Errorf("%w: %v", errInvalidParams, err)
 		}
+		if browseMode {
+			page := args.Page
+			if cfg.PaginationMode == "pit" {
+				page = 1
+			}
+			browsePlan, browsePlanErr = browse.Translate(args.Query, cfg.IndexPattern, pageSize, page, nil, nil)
+			if browsePlanErr != nil {
+				var evidence *browse.FieldEvidenceError
+				assured := false
+				if errors.As(browsePlanErr, &evidence) {
+					for _, field := range cfg.VerifiedExactFields {
+						assured = assured || field == evidence.Field
+					}
+				}
+				if !assured {
+					return nil, fmt.Errorf("%w: %v", errInvalidParams, browsePlanErr)
+				}
+			}
+		}
 	}
 	lease, err := cache.Acquire(ctx, cfg)
 	if err != nil {
@@ -366,7 +444,7 @@ func handleConnection(parent context.Context, cache *connectioncache.Cache, page
 	}
 	defer func() { err = errors.Join(err, lease.Release()) }()
 	client := lease.Client()
-	if method == "execute_query" && args.SessionID != "" && (cfg.PaginationMode != "pit" || sqlMode || (!browseMode && (operation.Method() != "POST" || !strings.HasSuffix(operation.Path(), "/_search")))) {
+	if method == "execute_query" && args.SessionID != "" && (cfg.PaginationMode != "pit" || sqlMode || pplMode || (!browseMode && (operation.Method() != "POST" || !strings.HasSuffix(operation.Path(), "/_search")))) {
 		if err := pages.ReleaseOwned(args.SessionID, cfg.ConnectionID); err != nil {
 			return nil, err
 		}
@@ -387,14 +465,54 @@ func handleConnection(parent context.Context, cache *connectioncache.Cache, page
 		}
 		return client.Columns(ctx, args.Table)
 	case "execute_query":
+		if pplMode {
+			data, err := client.PPL(ctx, pplOperation)
+			if err != nil {
+				return nil, err
+			}
+			return ppl.Normalize(pplOperation, data)
+		}
 		if browseMode {
 			page := args.Page
 			if cfg.PaginationMode == "pit" {
 				page = 1
 			}
-			plan, planErr := browse.Translate(args.Query, cfg.IndexPattern, pageSize, page, nil, nil)
+			plan, planErr := browsePlan, browsePlanErr
+			var indexUUID string
+			var evidence *browse.FieldEvidenceError
+			verified := make(map[string]bool, len(cfg.VerifiedExactFields))
+			for _, field := range cfg.VerifiedExactFields {
+				verified[field] = true
+			}
+			if errors.As(planErr, &evidence) && verified[evidence.Field] {
+				if strings.ContainsAny(sqlOperation.Index(), "*?") {
+					return nil, fmt.Errorf("%w: verified fields require one concrete index", errInvalidParams)
+				}
+				indexUUID, err = client.ConcreteIndexUUID(ctx, sqlOperation.Index())
+				if err != nil {
+					return nil, err
+				}
+				columns, err := client.Columns(ctx, sqlOperation.Index())
+				if err != nil {
+					return nil, err
+				}
+				plan, planErr = browse.Translate(args.Query, cfg.IndexPattern, pageSize, page, columns, verified)
+			}
 			if planErr != nil {
 				return nil, fmt.Errorf("%w: %v", errInvalidParams, planErr)
+			}
+			verifyIndex := func() error {
+				if indexUUID == "" {
+					return nil
+				}
+				current, err := client.ConcreteIndexUUID(ctx, sqlOperation.Index())
+				if err != nil {
+					return err
+				}
+				if current != indexUUID {
+					return errors.New("index changed during verified browse; retry the query")
+				}
+				return nil
 			}
 			if cfg.PaginationMode == "pit" {
 				if !plan.PITAllowed() {
@@ -410,16 +528,29 @@ func handleConnection(parent context.Context, cache *connectioncache.Cache, page
 					if err != nil {
 						return nil, err
 					}
+					if err := verifyIndex(); err != nil {
+						return nil, err
+					}
 					return browse.Normalize(plan, data)
 				}
-				data, err := pages.VerifiedPage(ctx, lease, cfg.ConnectionID, args.SessionID, plan.Request, args.Page, args.Query)
+				identity := args.Query
+				if indexUUID != "" {
+					identity += "\x00" + indexUUID
+				}
+				data, err := pages.VerifiedPage(ctx, lease, cfg.ConnectionID, args.SessionID, plan.Request, args.Page, identity)
 				if err != nil {
 					return nil, err
+				}
+				if err := verifyIndex(); err != nil {
+					return nil, errors.Join(err, pages.ReleaseOwned(args.SessionID, cfg.ConnectionID))
 				}
 				return browse.NormalizePIT(plan, data, args.Page)
 			}
 			data, err := client.Do(ctx, plan.Request)
 			if err != nil {
+				return nil, err
+			}
+			if err := verifyIndex(); err != nil {
 				return nil, err
 			}
 			return browse.Normalize(plan, data)

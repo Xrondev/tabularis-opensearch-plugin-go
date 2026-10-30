@@ -15,7 +15,15 @@ for label in linux-x64 linux-arm64 darwin-x64 darwin-arm64 win-x64; do
   unzip -p "$archive" .tabularium | jq -e '.id == "opensearch" and .capabilities.readonly == true' >/dev/null
   unzip -p "$archive" ui/dist/index.js >/dev/null
   unzip -p "$archive" ui/dist/raw-source.js >/dev/null
+  unzip -p "$archive" ppl.bundle.js | shasum -a 256 | grep -F "$(cut -d' ' -f1 "$root/ppl/bundle.sha256")" >/dev/null
+  unzip -p "$archive" licenses/opensearch-dashboards-LICENSE.txt >/dev/null
+  unzip -p "$archive" licenses/antlr4ng-LICENSE.txt >/dev/null
+  unzip -p "$archive" licenses/goja-LICENSE.txt >/dev/null
   unzip -p "$archive" locales/en.json | jq -e . >/dev/null
+  unzip -p "$archive" docs/specification.md >/dev/null
+  unzip -p "$archive" docs/implementation-plan.md >/dev/null
+  unzip -p "$archive" docs/tickets/001-opensearch-driver-v0.1.0.md >/dev/null
+  unzip -p "$archive" tests/host/README.md >/dev/null
 done
 
 case "$(uname -s)-$(uname -m)" in
@@ -28,6 +36,9 @@ esac
 scratch=$(mktemp -d "$root/bin/smoke.XXXXXXXX")
 trap 'rm -rf "$scratch"' EXIT
 unzip -p "opensearch-plugin-$label.zip" opensearch-plugin > "$scratch/opensearch-plugin"
+unzip -p "opensearch-plugin-$label.zip" ppl.bundle.js > "$scratch/ppl.bundle.js"
 chmod +x "$scratch/opensearch-plugin"
 printf '%s\n' '{"jsonrpc":"2.0","method":"get_databases","id":1}' | \
   "$scratch/opensearch-plugin" | jq -e '.id == 1 and .result == ["default"]' >/dev/null
+printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"execute_query","params":{"params":{"extra":{"endpoint":"http://127.0.0.1:1","deployment":"self_hosted","auth_mode":"anonymous","request_timeout_ms":"60000"}},"query":"#!ppl\nsource=events | fields count","limit":10,"page":1}}' | \
+  "$scratch/opensearch-plugin" | jq -e '.id == 2 and (.error.message | contains("OpenSearch transport failed"))' >/dev/null

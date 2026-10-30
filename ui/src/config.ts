@@ -35,6 +35,12 @@ export function validate(extra: Record<string, string>): string[] {
   if (deployment !== "self_hosted" && !extra.aws_region?.trim()) errors.push("errors.region");
   if (auth === "aws_profile" && !extra.aws_profile?.trim()) errors.push("errors.profile");
   if (extra.pagination_mode && extra.pagination_mode !== "offset" && extra.pagination_mode !== "pit") errors.push("errors.pagination_mode");
+  if (extra.verified_exact_fields) {
+    const fields = extra.verified_exact_fields.split(",").map((field) => field.trim());
+    if (fields.length > 100 || fields.some((field) => !/^[A-Za-z0-9_-]+$/.test(field)) || new Set(fields).size !== fields.length) {
+      errors.push("errors.verified_exact_fields");
+    }
+  }
   for (const [key, low, high] of [["page_size", 1, 1000], ["request_timeout_ms", 1000, 300000]] as const) {
     const value = extra[key];
     if (value && (!/^\d+$/.test(value) || Number(value) < low || Number(value) > high)) {

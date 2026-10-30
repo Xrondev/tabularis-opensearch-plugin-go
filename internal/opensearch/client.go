@@ -21,6 +21,7 @@ import (
 	"github.com/opensearch-project/opensearch-go/v5/signer"
 
 	"tabularis-opensearch-plugin-go/internal/connection"
+	"tabularis-opensearch-plugin-go/internal/ppl"
 	"tabularis-opensearch-plugin-go/internal/query"
 	"tabularis-opensearch-plugin-go/internal/sqlquery"
 )
@@ -91,6 +92,60 @@ func (c *Client) Close() error {
 	return c.client.Close()
 }
 
+func (c *Client) PPL(ctx context.Context, operation ppl.Query) (json.RawMessage, error) {
+	if err := operation.Validate(); err != nil {
+		return nil, err
+	}
+	index := operation.Index()
+	allowed := false
+	for _, pattern := range strings.Split(c.config.IndexPattern, ",") {
+		if index == pattern {
+			allowed = true
+			break
+		}
+		if strings.Contains(index, "*") {
+			continue
+		}
+		matched, err := path.Match(pattern, index)
+		if err != nil {
+			return nil, errors.New("invalid index pattern")
+		}
+		allowed = allowed || matched
+	}
+	if !allowed {
+		return nil, errors.New("PPL index is outside the configured scope")
+	}
+	body, err := json.Marshal(struct {
+		Query string `json:"query"`
+	}{Query: operation.Text()})
+	if err != nil || len(body) > 8*1024*1024 {
+		return nil, errors.New("PPL request is invalid or exceeds the size limit")
+	}
+	ctx, cancel := context.WithTimeout(ctx, c.config.Timeout)
+	defer cancel()
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, "/_plugins/_ppl", bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.New("create PPL request")
+	}
+	request.Header.Set("Content-Type", "application/json")
+	response, err := c.client.Transport.Stream(request)
+	if err != nil {
+		return nil, transportFailure(ctx, err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return nil, httpFailure(response.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
+	if err != nil {
+		return nil, transportFailure(ctx, err)
+	}
+	if len(data) > maxResponseBytes || !json.Valid(data) {
+		return nil, errors.New("PPL response is invalid or exceeds the size limit")
+	}
+	return json.RawMessage(data), nil
+}
+
 func (c *Client) SQL(ctx context.Context, operation sqlquery.Query) (json.RawMessage, error) {
 	if err := operation.Validate(); err != nil {
 		return nil, err
@@ -132,15 +187,15 @@ func (c *Client) SQL(ctx context.Context, operation sqlquery.Query) (json.RawMes
 	request.Header.Set("Content-Type", "application/json")
 	response, err := c.client.Transport.Stream(request)
 	if err != nil {
-		return nil, fmt.Errorf("OpenSearch network request failed: %w", err)
+		return nil, transportFailure(ctx, err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf("OpenSearch SQL request failed with HTTP status %d", response.StatusCode)
+		return nil, httpFailure(response.StatusCode)
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
 	if err != nil {
-		return nil, errors.New("read SQL response")
+		return nil, transportFailure(ctx, err)
 	}
 	if len(data) > maxResponseBytes {
 		return nil, errors.New("SQL response exceeded the size limit")
@@ -179,11 +234,11 @@ func (c *Client) closeSQLCursor(cursor string) error {
 	request.Header.Set("Content-Type", "application/json")
 	response, err := c.client.Transport.Stream(request)
 	if err != nil {
-		return errors.New("SQL cursor cleanup request failed")
+		return transportFailure(ctx, err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("SQL cursor cleanup returned HTTP status %d", response.StatusCode)
+		return httpFailure(response.StatusCode)
 	}
 	var result struct {
 		Succeeded bool `json:"succeeded"`
@@ -263,15 +318,15 @@ func (c *Client) Do(ctx context.Context, operation query.Request) (json.RawMessa
 	}
 	response, err := c.client.Transport.Stream(request)
 	if err != nil {
-		return nil, fmt.Errorf("OpenSearch network request failed: %w", err)
+		return nil, transportFailure(ctx, err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf("OpenSearch request failed with HTTP status %d", response.StatusCode)
+		return nil, httpFailure(response.StatusCode)
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("read OpenSearch response: %w", err)
+		return nil, transportFailure(ctx, err)
 	}
 	if len(data) > maxResponseBytes {
 		return nil, errors.New("OpenSearch response exceeded the size limit")
@@ -391,15 +446,15 @@ func (c *Client) get(ctx context.Context, endpoint string, query url.Values, tar
 	request.URL.RawQuery = query.Encode()
 	response, err := c.client.Transport.Stream(request)
 	if err != nil {
-		return fmt.Errorf("OpenSearch network request failed: %w", err)
+		return transportFailure(ctx, err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("OpenSearch request failed with HTTP status %d", response.StatusCode)
+		return httpFailure(response.StatusCode)
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
 	if err != nil {
-		return fmt.Errorf("read OpenSearch response: %w", err)
+		return transportFailure(ctx, err)
 	}
 	if len(data) > maxResponseBytes {
 		return errors.New("OpenSearch response exceeded the size limit")

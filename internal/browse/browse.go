@@ -25,6 +25,14 @@ type Plan struct {
 	exhausted bool
 }
 
+type FieldEvidenceError struct {
+	Field string
+}
+
+func (e *FieldEvidenceError) Error() string {
+	return fmt.Sprintf("field %q lacks verified scalar and null semantics", e.Field)
+}
+
 func (p Plan) PITAllowed() bool {
 	return !p.count && p.limit != 0
 }
@@ -102,6 +110,24 @@ func Translate(text, pattern string, pageSize, page int, columns []opensearch.Co
 	count, countName, candidate := projection(selects[0])
 	if !candidate {
 		return Plan{}, errors.New("browse SQL supports SELECT * or COUNT(*)")
+	}
+	if where, ok := statement.Arg("where").(expressions.Expression); ok && where != nil {
+		if err := validatePredicate(where.This()); err != nil {
+			return Plan{}, err
+		}
+	}
+	if order, ok := statement.Arg("order").(expressions.Expression); ok && order != nil {
+		if count {
+			return Plan{}, errors.New("COUNT(*) does not support ordering")
+		}
+		for _, item := range order.Expressions() {
+			if item.Kind() != expressions.KindOrdered || item.This() == nil || item.This().Kind() != expressions.KindColumn {
+				return Plan{}, errors.New("unsupported browse sort")
+			}
+			if _, err := fieldName(item.This()); err != nil {
+				return Plan{}, err
+			}
+		}
 	}
 	types := make(map[string]string, len(columns))
 	for _, column := range columns {
@@ -241,7 +267,7 @@ func Normalize(plan Plan, raw []byte) (query.Result, error) {
 	return result, nil
 }
 
-func mappedField(column expressions.Expression, types map[string]string, verifiedExactFields map[string]bool) (string, error) {
+func fieldName(column expressions.Expression) (string, error) {
 	if column.TableName() != "" || column.SchemaName() != "" || column.CatalogName() != "" {
 		return "", errors.New("qualified browse fields are not supported")
 	}
@@ -252,8 +278,16 @@ func mappedField(column expressions.Expression, types map[string]string, verifie
 	if name == "" || strings.Contains(name, ".") {
 		return "", errors.New("dotted, nested, or multi-field browse columns are ambiguous")
 	}
+	return name, nil
+}
+
+func mappedField(column expressions.Expression, types map[string]string, verifiedExactFields map[string]bool) (string, error) {
+	name, err := fieldName(column)
+	if err != nil {
+		return "", err
+	}
 	if !verifiedExactFields[name] {
-		return "", fmt.Errorf("field %q lacks verified scalar and null semantics", name)
+		return "", &FieldEvidenceError{Field: name}
 	}
 	typ := types[name]
 	switch typ {
@@ -264,12 +298,79 @@ func mappedField(column expressions.Expression, types map[string]string, verifie
 	}
 }
 
+func validatePredicate(node expressions.Expression) error {
+	if node == nil {
+		return errors.New("invalid browse filter")
+	}
+	switch node.Kind() {
+	case expressions.KindParen:
+		return validatePredicate(node.This())
+	case expressions.KindAnd, expressions.KindOr:
+		if err := validatePredicate(node.This()); err != nil {
+			return err
+		}
+		return validatePredicate(node.Expr())
+	case expressions.KindNot:
+		if node.This() == nil || node.This().Kind() != expressions.KindIs {
+			return errors.New("unsupported browse filter")
+		}
+		return validatePredicate(node.This())
+	case expressions.KindIs:
+		if node.Expr() == nil || node.Expr().Kind() != expressions.KindNull {
+			return errors.New("unsupported browse filter")
+		}
+	case expressions.KindEQ, expressions.KindNEQ, expressions.KindGT, expressions.KindGTE, expressions.KindLT, expressions.KindLTE, expressions.KindIn:
+	default:
+		return errors.New("unsupported browse filter")
+	}
+	column := node.This()
+	if column == nil || column.Kind() != expressions.KindColumn {
+		return errors.New("browse filter requires a mapped field on the left")
+	}
+	if _, err := fieldName(column); err != nil {
+		return err
+	}
+	if node.Kind() == expressions.KindIs {
+		return nil
+	}
+	items := []expressions.Expression{node.Expr()}
+	if node.Kind() == expressions.KindIn {
+		items = node.Expressions()
+		if len(items) == 0 {
+			return errors.New("browse IN requires values")
+		}
+	}
+	for _, item := range items {
+		if item == nil {
+			return errors.New("browse filter requires a scalar literal")
+		}
+		if _, err := scalar(item, "keyword"); err == nil {
+			continue
+		}
+		if _, err := scalar(item, "boolean"); err == nil {
+			continue
+		}
+		if _, err := scalar(item, "integer"); err != nil {
+			return errors.New("browse filter requires a scalar literal")
+		}
+	}
+	return nil
+}
+
 func predicate(node expressions.Expression, types map[string]string, verifiedExactFields map[string]bool) (map[string]any, error) {
 	if node == nil {
 		return nil, errors.New("invalid browse filter")
 	}
 	if node.Kind() == expressions.KindParen {
 		return predicate(node.This(), types, verifiedExactFields)
+	}
+	if node.Kind() == expressions.KindNot {
+		column := node.This().This()
+		field, err := mappedField(column, types, verifiedExactFields)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"exists": map[string]any{"field": field}}, nil
 	}
 	if node.Kind() == expressions.KindAnd || node.Kind() == expressions.KindOr {
 		left, err := predicate(node.This(), types, verifiedExactFields)
@@ -292,6 +393,9 @@ func predicate(node expressions.Expression, types map[string]string, verifiedExa
 	field, err := mappedField(column, types, verifiedExactFields)
 	if err != nil {
 		return nil, err
+	}
+	if node.Kind() == expressions.KindIs {
+		return map[string]any{"bool": map[string]any{"must_not": []any{map[string]any{"exists": map[string]any{"field": field}}}}}, nil
 	}
 	if node.Kind() == expressions.KindIn {
 		items := make([]any, 0, len(node.Expressions()))

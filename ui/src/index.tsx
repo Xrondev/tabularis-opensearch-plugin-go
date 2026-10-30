@@ -102,6 +102,11 @@ const ConnectionFields = defineSlot("connection-modal.extra_fields", ({ context,
         <input style={inputStyle} value={extra.index_pattern ?? ""} placeholder="*" onChange={(event) => setExtraField("index_pattern", event.target.value)} />
       </label>
       <label style={labelStyle}>
+        {t("verified_exact_fields")}
+        <input style={inputStyle} value={extra.verified_exact_fields ?? ""} placeholder="count, status" onChange={(event) => setExtraField("verified_exact_fields", event.target.value)} />
+        <small>{t("verified_exact_fields_warning")}</small>
+      </label>
+      <label style={labelStyle}>
         {t("page_size")}
         <input type="number" min={1} max={1000} style={inputStyle} value={extra.page_size ?? ""} placeholder="100" onChange={(event) => setExtraField("page_size", event.target.value)} />
       </label>

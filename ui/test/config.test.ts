@@ -25,4 +25,12 @@ describe("connection configuration", () => {
     expect(validate({ ...config, pagination_mode: "pit" })).toEqual([]);
     expect(validate({ ...config, pagination_mode: "unknown" })).toContain("errors.pagination_mode");
   });
+
+  it("accepts only unambiguous top-level verified field names", () => {
+    const config = { endpoint: "http://localhost:9200", deployment: "self_hosted", auth_mode: "anonymous" };
+    expect(validate({ ...config, verified_exact_fields: "count, status_code" })).toEqual([]);
+    expect(validate({ ...config, verified_exact_fields: "nested.field" })).toContain("errors.verified_exact_fields");
+    expect(validate({ ...config, verified_exact_fields: "count,,status" })).toContain("errors.verified_exact_fields");
+    expect(validate({ ...config, verified_exact_fields: "count,count" })).toContain("errors.verified_exact_fields");
+  });
 });

@@ -54,6 +54,19 @@ func TestGeneratedColumnsRequireUnambiguousVerifiedMappings(t *testing.T) {
 	}
 }
 
+func TestNullFiltersRequireVerifiedUnambiguousFields(t *testing.T) {
+	for _, predicate := range []string{`"_source.count" IS NULL`, `"_source.count" IS NOT NULL`} {
+		statement := `SELECT * FROM "events" WHERE ` + predicate
+		column := opensearch.Column{Name: "count", DataType: "long", Comment: "source field"}
+		if _, err := browse.Translate(statement, "events", 10, 1, []opensearch.Column{column}, nil); err == nil {
+			t.Fatalf("unverified field accepted: %s", predicate)
+		}
+		if _, err := browse.Translate(statement, "events", 10, 1, []opensearch.Column{column, column}, map[string]bool{"count": true}); err == nil {
+			t.Fatalf("ambiguous field accepted: %s", predicate)
+		}
+	}
+}
+
 func TestCountPreservesLargeIntegers(t *testing.T) {
 	plan, err := browse.Translate(`SELECT COUNT(*) AS count FROM "events"`, "events", 100, 1, nil, nil)
 	if err != nil {

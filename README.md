@@ -6,6 +6,14 @@ A Go driver for exploring OpenSearch from Tabularis. The project is under active
 
 Requirements: the Go version in `go.mod`, Node.js 20.19 or newer, npm, and Docker for real OpenSearch integration tests.
 
+Build the pinned PPL parser artifact before packaging or installing the driver:
+
+```sh
+bash ppl/build.sh
+```
+
+The packaged Go executable loads this integrity-checked artifact next to the executable; Node.js is not required at runtime.
+
 ```sh
 go test -race ./...
 go vet ./...
@@ -43,6 +51,8 @@ go test -race ./...
 
 Do not run test setup writes against formal data sources. AWS managed-domain and Serverless integration require authorized endpoints, policies and credentials; their validation is pending.
 
+`bash scripts/ci-tabularis-host.sh` exercises the driver through the released Tabularis Web HTTP RPC interface using isolated disposable containers. It does not test the browser UI. See [host-test notes](tests/host/README.md) for the released host's sign-in and PIT cleanup behavior.
+
 ## Snapshot packages
 
 After building the UI, `scripts/package.sh` builds snapshot ZIPs and SHA-256 checksums under `bin/packages/` for Linux amd64/arm64, macOS amd64/arm64, and Windows amd64. These artifacts are not releases and are not automatically published. Cross-compilation does not establish native runtime compatibility.
@@ -56,7 +66,7 @@ Release publication requires the specification's compatibility, license, notice,
 
 ## Current query behavior
 
-Use `#!dsl` for a JSON search envelope, `#!rest` for allowlisted inspection, or `#!sql` for the validated native SQL subset. Unprefixed simple table queries use the browse adapter. The grid's generated field filters and sorts require verified field semantics; the current connection path rejects them when that evidence is unavailable. Unsupported syntax is rejected. PPL is not implemented.
+Use `#!dsl` for a JSON search envelope, `#!rest` for allowlisted inspection, `#!sql` for the validated native SQL subset, or `#!ppl` for the validated PPL subset. Unprefixed simple table queries use the browse adapter. Grid filters and sorts work for explicitly verified top-level fields on a concrete index. In the connection form, list fields only after verifying that they are single-valued, have no `null_value` or normalizer, and have matching SQL/DSL semantics across the connection. Every non-null value must be visible to `exists`, including values affected by `ignore_above`, `ignore_malformed`, and indexing settings. Verified browsing requires permission to resolve the index and read its settings, and checks its UUID before mapping and after search. Keep index identity and mappings stable during queries: these checks cannot detect every concurrent change. Unverified, ambiguous and unsupported fields are rejected.
 
 For example, execute a search in the Tabularis editor:
 
@@ -75,6 +85,11 @@ GET /events/_mapping
 ```text
 #!sql
 SELECT COUNT(*) FROM "events"
+```
+
+```text
+#!ppl
+source=events | fields count | sort count
 ```
 
 In the connection form, enter the endpoint, deployment, authentication mode and, for AWS, the region and credential mode. Explicit AWS credential values use Tabularis connection secrets. Self-hosted HTTP endpoints require explicit configuration; HTTPS verifies certificates and supports a custom CA.

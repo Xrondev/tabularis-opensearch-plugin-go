@@ -23,6 +23,8 @@
   "secure_storage_required": "Secure credential storage is unavailable. AWS access keys cannot be saved.",
   "insecure_basic": "Basic credentials will be sent without TLS over HTTP.",
   "index_pattern": "Index pattern",
+  "verified_exact_fields": "Verified fields for grid filtering and sorting",
+  "verified_exact_fields_warning": "Only list top-level fields you have verified are single-valued, have no null_value or normalizer, and have equivalent SQL and Query DSL semantics in every index you query. Every non-null value must be visible to exists, including values affected by ignore_above, ignore_malformed, and indexing settings. Verified fields require one concrete index and permission to resolve it and read its settings. Keep index identity and mappings stable during queries; UUID checks cannot detect every concurrent change. Incorrect assurances can produce incorrect results. Separate names with commas.",
   "page_size": "Page size",
   "pagination_mode": "Pagination mode",
   "pagination_offset": "Bounded offset",
@@ -40,6 +42,7 @@
     "endpoint_required": "Enter a valid endpoint URL.",
     "region": "AWS region is required.",
     "profile": "AWS profile is required.",
+    "verified_exact_fields": "Enter up to 100 unique top-level field names using letters, digits, underscores, or hyphens.",
     "page_size": "Page size must be an integer between 1 and 1000.",
     "pagination_mode": "Choose a supported pagination mode.",
     "request_timeout_ms": "Request timeout must be an integer between 1000 and 300000 milliseconds."

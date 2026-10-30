@@ -19,22 +19,23 @@ type Params struct {
 }
 
 type Config struct {
-	ConnectionID    string
-	Endpoint        string
-	Deployment      string
-	AuthMode        string
-	Username        string
-	Password        string
-	CAPath          string
-	Region          string
-	Profile         string
-	AccessKeyID     string
-	SecretAccessKey string
-	SessionToken    string
-	IndexPattern    string
-	PaginationMode  string
-	Timeout         time.Duration
-	PageSize        int
+	ConnectionID        string
+	Endpoint            string
+	Deployment          string
+	AuthMode            string
+	Username            string
+	Password            string
+	CAPath              string
+	Region              string
+	Profile             string
+	AccessKeyID         string
+	SecretAccessKey     string
+	SessionToken        string
+	IndexPattern        string
+	PaginationMode      string
+	VerifiedExactFields []string
+	Timeout             time.Duration
+	PageSize            int
 }
 
 func Parse(params Params) (Config, error) {
@@ -118,6 +119,26 @@ func Parse(params Params) (Config, error) {
 	}
 	if config.PaginationMode != "offset" && config.PaginationMode != "pit" {
 		return Config{}, errors.New("pagination_mode must be offset or pit")
+	}
+	if value := extra["verified_exact_fields"]; value != "" {
+		fields := strings.Split(value, ",")
+		if len(fields) > 100 {
+			return Config{}, errors.New("verified_exact_fields must contain at most 100 field names")
+		}
+		seen := make(map[string]bool, len(fields))
+		for _, field := range fields {
+			field = strings.TrimSpace(field)
+			if field == "" || seen[field] {
+				return Config{}, errors.New("verified_exact_fields must contain unique top-level field names")
+			}
+			for _, c := range field {
+				if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-') {
+					return Config{}, errors.New("verified_exact_fields contains an invalid top-level field name")
+				}
+			}
+			seen[field] = true
+			config.VerifiedExactFields = append(config.VerifiedExactFields, field)
+		}
 	}
 	if strings.ContainsAny(config.IndexPattern, "/\\?#%") || strings.Contains(config.IndexPattern, "..") {
 		return Config{}, errors.New("index pattern contains invalid path characters")

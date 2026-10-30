@@ -1,0 +1,6 @@
+{"index":{"_index":"tabularis_host_fixture","_id":"1"}}
+{"count":3,"message":"one"}
+{"index":{"_index":"tabularis_host_fixture","_id":"2"}}
+{"count":4,"message":"two"}
+{"index":{"_index":"tabularis_host_fixture","_id":"3"}}
+{"count":5,"message":"three"}
