@@ -33,6 +33,8 @@ npm run build
 
 The Go executable communicates using newline-delimited JSON-RPC on standard input and output. Diagnostics go to standard error. The UI bundle is produced at `ui/dist/index.js`; `.tabularium` is the driver manifest.
 
+The `discover_aws_endpoints` JSON-RPC method accepts `deployment`, `region`, and `profile` and returns read-only AWS resource discovery results. The Tabularis connection form cannot invoke this method with its current plugin API, so endpoint selection in the form is not yet available; manual endpoint entry remains supported.
+
 ## Local integration tests
 
 `scripts/ci-opensearch.sh` creates a disposable OpenSearch Docker container and fixture indices, runs the real integration tests, and removes that specific container when finished. It binds an automatically selected port to loopback and does not use an existing data source. The script creates and writes fixture documents only inside its own disposable container.
