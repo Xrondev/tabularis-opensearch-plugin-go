@@ -9,21 +9,32 @@ import (
 	"net"
 )
 
+type httpStatusError struct {
+	status  int
+	message string
+}
+
+func (e *httpStatusError) Error() string {
+	return e.message
+}
+
 func httpFailure(status int) error {
+	var message string
 	switch {
 	case status == 401:
-		return fmt.Errorf("OpenSearch authentication failed (HTTP status %d); check credentials", status)
+		message = fmt.Sprintf("OpenSearch request unauthorized (HTTP status %d); check credentials and applicable network and access policies", status)
 	case status == 403:
-		return fmt.Errorf("OpenSearch permission denied (HTTP status %d); check access policies", status)
+		message = fmt.Sprintf("OpenSearch request denied (HTTP status %d); check credentials, request signing, and applicable network and access policies", status)
 	case status == 404:
-		return fmt.Errorf("OpenSearch resource or API not found (HTTP status %d); check the target and API availability", status)
+		message = fmt.Sprintf("OpenSearch resource or API not found (HTTP status %d); check the target and API availability", status)
 	case status == 429:
-		return fmt.Errorf("OpenSearch rate limit exceeded (HTTP status %d); retry later", status)
+		message = fmt.Sprintf("OpenSearch rate limit exceeded (HTTP status %d); retry later", status)
 	case status >= 500 && status <= 599:
-		return fmt.Errorf("OpenSearch service error (HTTP status %d); check service health", status)
+		message = fmt.Sprintf("OpenSearch service error (HTTP status %d); check service health", status)
 	default:
-		return fmt.Errorf("OpenSearch request rejected (HTTP status %d)", status)
+		message = fmt.Sprintf("OpenSearch request rejected (HTTP status %d)", status)
 	}
+	return &httpStatusError{status: status, message: message}
 }
 
 func transportFailure(ctx context.Context, err error) error {

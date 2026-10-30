@@ -51,7 +51,7 @@ OPENSEARCH_TEST_FIXTURE_INDEX=tabularis_pit_fixture \
 go test -race ./...
 ```
 
-Do not run test setup writes against formal data sources. AWS managed-domain and Serverless integration require authorized endpoints, policies and credentials; their validation is pending.
+Do not run test setup writes against formal data sources. Read-only metadata checks have passed against a managed domain and a Serverless vector collection. The full AWS compatibility matrix, including SSO credential refresh, multiple accounts and regions, and Serverless search and time-series collections, remains unverified.
 
 `bash scripts/ci-tabularis-host.sh` exercises the driver through the released Tabularis Web HTTP RPC interface using isolated disposable containers. It does not test the browser UI. See [host-test notes](tests/host/README.md) for the released host's sign-in and PIT cleanup behavior.
 
@@ -71,6 +71,8 @@ Release publication requires the specification's compatibility, third-party noti
 Apache License 2.0. See [LICENSE](LICENSE).
 
 ## Current query behavior
+
+Run queries in the built-in Tabularis console. The console uses SQL editor highlighting; select the OpenSearch query format with the prefix on the first line.
 
 Use `#!dsl` for a JSON search envelope, `#!rest` for allowlisted inspection, `#!sql` for the validated native SQL subset, or `#!ppl` for the validated PPL subset. Unprefixed simple table queries use the browse adapter. Grid filters and sorts work for explicitly verified top-level fields on a concrete index. In the connection form, list fields only after verifying that they are single-valued, have no `null_value` or normalizer, and have matching SQL/DSL semantics across the connection. Every non-null value must be visible to `exists`, including values affected by `ignore_above`, `ignore_malformed`, and indexing settings. Verified browsing requires permission to resolve the index and read its settings, and checks its UUID before mapping and after search. Keep index identity and mappings stable during queries: these checks cannot detect every concurrent change. Unverified, ambiguous and unsupported fields are rejected.
 
@@ -101,3 +103,18 @@ source=events | fields count | sort count
 In the connection form, enter the endpoint, deployment, authentication mode and, for AWS, the region and credential mode. Explicit AWS credential values use Tabularis connection secrets. Self-hosted HTTP endpoints require explicit configuration; HTTPS verifies certificates and supports a custom CA.
 
 Numbered offset pages do not provide snapshot consistency. Native SQL pages after the first require `ORDER BY`. The connection form also offers an opt-in PIT mode for document searches: it requires a saved connection, a host query session, one concrete one-primary-shard index, and permission to resolve the index, read its settings, and create, search, and close a PIT. It sorts on `_id`, which may consume significant server memory. The built-in JSON viewer may round large numbers; use the **View raw document JSON** row action for the original source text.
+
+## Limitations
+
+- Connection testing requires permission to list indices, even when the profile can query a known index. A successful test does not establish permission for every query.
+- SQL and PPL support validated read-only subsets. SQL cursor responses and PPL pagination are not supported; scripted DSL searches are rejected.
+- Grid filtering and sorting require explicitly verified top-level fields. Nested, dotted, ambiguous, and unsupported field mappings are rejected.
+- The explorer lists index names; aliases, settings, and statistics do not have dedicated explorer views. Supported inspection endpoints are available through `#!rest`.
+- In Tabularis 0.30.0, PIT cleanup is verified through idle expiry rather than immediate tab-close release. See [host-test notes](tests/host/README.md).
+- The client does not automatically retry requests. Cross-compiled packages are not evidence of native installation on every platform.
+
+## TODO
+
+- Add an OpenSearch-specific console as a top-level editor tab, selectable alongside the SQL console from the **+** button, when Tabularis officially supports plugin-provided editor tabs and tab creation.
+- Expand safe pagination, field filtering, and metadata browsing, and add bounded retries.
+- Complete AWS compatibility testing, native platform validation, the compatibility matrix, and third-party notices before release.

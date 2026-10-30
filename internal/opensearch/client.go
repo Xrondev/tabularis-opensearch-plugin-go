@@ -339,6 +339,10 @@ func (c *Client) Do(ctx context.Context, operation query.Request) (json.RawMessa
 
 func (c *Client) Test(ctx context.Context) error {
 	_, err := c.Tables(ctx)
+	var status *httpStatusError
+	if errors.As(err, &status) && (status.status == http.StatusUnauthorized || status.status == http.StatusForbidden) {
+		return fmt.Errorf("connection test could not list indices; the test requires index-listing access. Check the selected credentials, region, request signing, and applicable network and access policies. Access to individual indices may not include permission to list them: %w", err)
+	}
 	return err
 }
 

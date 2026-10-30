@@ -194,8 +194,12 @@ func TestRealOpenSearchAuthenticationAndTLSFailures(t *testing.T) {
 		}
 	})
 	_, err = client.Tables(context.Background())
-	if err == nil || !strings.Contains(err.Error(), "authentication failed") || !strings.Contains(err.Error(), "401") || strings.Contains(err.Error(), "private-secret") || strings.Contains(err.Error(), "private-user") {
+	if err == nil || !strings.Contains(err.Error(), "request unauthorized") || !strings.Contains(err.Error(), "401") || strings.Contains(err.Error(), "private-secret") || strings.Contains(err.Error(), "private-user") {
 		t.Fatalf("unexpected authentication error: %v", err)
+	}
+	err = client.Test(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "could not list indices") || !strings.Contains(err.Error(), "401") || strings.Contains(err.Error(), "private-secret") || strings.Contains(err.Error(), "private-user") {
+		t.Fatalf("unexpected connection-test error: %v", err)
 	}
 	config.CAPath = ""
 	clientWithoutCA, err := opensearch.New(config, nil)
@@ -237,7 +241,11 @@ func TestRealOpenSearchPermissionFailure(t *testing.T) {
 		}
 	})
 	_, err = client.Tables(context.Background())
-	if err == nil || !strings.Contains(err.Error(), "permission denied") || !strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), password) || strings.Contains(err.Error(), username) {
+	if err == nil || !strings.Contains(err.Error(), "request denied") || !strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), password) || strings.Contains(err.Error(), username) {
 		t.Fatalf("unexpected permission error: %v", err)
+	}
+	err = client.Test(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "could not list indices") || !strings.Contains(err.Error(), "index-listing access") || !strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), password) || strings.Contains(err.Error(), username) {
+		t.Fatalf("unexpected connection-test error: %v", err)
 	}
 }
