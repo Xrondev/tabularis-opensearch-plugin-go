@@ -1,0 +1,52 @@
+{
+  "id": "opensearch",
+  "name": "OpenSearch",
+  "version": "0.1.0",
+  "kind": "driver",
+  "engine": "opensearch",
+  "paradigms": ["document", "search", "vector"],
+  "description": "Browse and query OpenSearch indices from Tabularis.",
+  "executable": "opensearch-plugin",
+  "connection_fields": {
+    "host": { "hidden": true },
+    "port": { "hidden": true },
+    "database": { "hidden": true }
+  },
+  "ui_extensions": [
+    {
+      "slot": "connection-modal.extra_fields",
+      "module": "ui/dist/index.js",
+      "driver": "opensearch"
+    },
+    {
+      "slot": "data-grid.context-menu.items",
+      "module": "ui/dist/raw-source.js",
+      "driver": "opensearch"
+    }
+  ],
+  "capabilities": {
+    "schemas": false,
+    "views": false,
+    "routines": false,
+    "file_based": false,
+    "single_database": true,
+    "connection_string": false,
+    "supports_ssl": true,
+    "readonly": true,
+    "manage_tables": false,
+    "alter_primary_key": false,
+    "alter_column": false,
+    "create_foreign_keys": false,
+    "identifier_quote": "\"",
+    "sql_dialect": "generic"
+  },
+  "data_types": [
+    { "name": "text", "category": "string", "requires_length": false, "requires_precision": false },
+    { "name": "keyword", "category": "string", "requires_length": false, "requires_precision": false },
+    { "name": "long", "category": "numeric", "requires_length": false, "requires_precision": false },
+    { "name": "double", "category": "numeric", "requires_length": false, "requires_precision": false },
+    { "name": "date", "category": "date", "requires_length": false, "requires_precision": false },
+    { "name": "boolean", "category": "other", "requires_length": false, "requires_precision": false },
+    { "name": "JSON", "category": "json", "requires_length": false, "requires_precision": false }
+  ]
+}
