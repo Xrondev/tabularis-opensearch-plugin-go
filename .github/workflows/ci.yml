@@ -2,6 +2,8 @@ name: CI
 
 on:
   push:
+    branches: ['**']
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -26,6 +28,91 @@ jobs:
           name: ppl-parser
           path: ppl/dist/ppl.bundle.js
           if-no-files-found: error
+
+  release:
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+    needs: [ppl-parser, go, ui, vulnerabilities, integration, tabularis-host, snapshot-packages]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: snapshot-packages
+          path: release-assets
+      - name: Validate release assets
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo 'Release tag must have the form vX.Y.Z.' >&2
+            exit 1
+          fi
+          test "${TAG#v}" = "$(jq -er '.version | strings' .tabularium)"
+          cmp .tabularium release-assets/default.tabularium
+          cd release-assets
+          sha256sum -c default.tabularium.sha256
+          for platform in linux-x64 linux-arm64 darwin-x64 darwin-arm64 win-x64 windows-aarch64; do
+            sha256sum -c "opensearch-plugin-$platform.zip.sha256"
+          done
+      - name: Publish experimental release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          check_tag() {
+            local remote_commit
+            remote_commit=$(git ls-remote origin "refs/tags/${TAG}^{}" | cut -f1)
+            if [ -z "$remote_commit" ]; then
+              remote_commit=$(git ls-remote origin "refs/tags/$TAG" | cut -f1)
+            fi
+            if [ -z "$remote_commit" ] || [ "$remote_commit" != "$(git rev-parse "${GITHUB_SHA}^{commit}")" ]; then
+              echo 'The remote tag does not point to the tested commit.' >&2
+              exit 1
+            fi
+          }
+          check_tag
+          assets=(default.tabularium default.tabularium.sha256)
+          for platform in linux-x64 linux-arm64 darwin-x64 darwin-arm64 win-x64 windows-aarch64; do
+            assets+=("opensearch-plugin-$platform.zip" "opensearch-plugin-$platform.zip.sha256")
+          done
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            release_state=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease,assets)
+            if [ "$(jq -r '.isPrerelease' <<< "$release_state")" != true ]; then
+              echo 'The existing release is not marked as a prerelease.' >&2
+              exit 1
+            fi
+            if [ "$(jq -r '.isDraft' <<< "$release_state")" != true ]; then
+              for asset in "${assets[@]}"; do
+                if ! jq -e --arg name "$asset" '[.assets[] | select(.name == $name and .state == "uploaded" and .size > 0)] | length == 1' <<< "$release_state" >/dev/null; then
+                  echo "The published release is missing a complete asset: $asset" >&2
+                  exit 1
+                fi
+              done
+              check_tag
+              echo 'The experimental release already contains all expected assets; no changes were made.'
+              exit 0
+            fi
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --prerelease \
+              --title "$TAG (experimental)" \
+              --notes "Experimental read-only OpenSearch plugin. See https://github.com/$GITHUB_REPOSITORY/blob/$TAG/docs/compatibility.md for tested environments and limitations."
+          fi
+          cd release-assets
+          if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" != true ]; then
+            echo 'This release is already published; its assets will not be changed.' >&2
+            exit 1
+          fi
+          gh release upload "$TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+          check_tag
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest=false
 
   go:
     needs: ppl-parser

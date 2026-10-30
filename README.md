@@ -166,6 +166,10 @@ bash scripts/smoke-packages.sh
 
 Before publishing, validate the manifest, archive contents, checksums, and third-party notices. An experimental release must describe the limits of its compatibility evidence.
 
+### Automated experimental releases
+
+Push a new version tag in the form `vX.Y.Z` that matches the version in `.tabularium`. CI runs the test and packaging jobs, then publishes the checked ZIPs, checksums, and standalone manifest as a GitHub prerelease only if all required jobs pass. Each tag has its own release; publishing a later version does not replace earlier releases. Pushing a branch or opening a pull request does not publish a release. The repository's visibility controls who can access the release assets.
+
 ## Acknowledgments
 
 The [Tabularis Elasticsearch plugin](https://github.com/TabularisDB/tabularis-elasticsearch-plugin) informed this project's Tabularis integration and query-mode design. Thanks to its maintainers and contributors.

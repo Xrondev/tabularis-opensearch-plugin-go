@@ -34,7 +34,7 @@ ZIP archives contain the driver, manifest, PPL parser artifact, UI bundles, docu
 
 ## Experimental release assets
 
-Release preparation produces platform ZIPs and SHA-256 checksum files, plus a standalone `default.tabularium` manifest and its checksum. The GitHub release tag must match the manifest version after removing any leading `v`. Packaging and checksums do not publish a release; validate the assets and registry manifest before submitting them. See the [Tabularis plugin publishing guide](https://github.com/TabularisDB/tabularis/blob/main/plugins/PLUGIN_GUIDE.md#8-publishing-your-plugin).
+Release preparation produces platform ZIPs and SHA-256 checksum files, plus a standalone `default.tabularium` manifest and its checksum. A pushed `vX.Y.Z` tag must match the manifest version after removing the leading `v`. After all required CI jobs pass, the workflow publishes the verified assets as a GitHub prerelease. Running packaging locally does not publish a release. See the [Tabularis plugin publishing guide](https://github.com/TabularisDB/tabularis/blob/main/plugins/PLUGIN_GUIDE.md#8-publishing-your-plugin).
 
 ## Known operation limits
 
