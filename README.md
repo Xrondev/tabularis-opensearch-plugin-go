@@ -2,6 +2,8 @@
 
 A Go driver for exploring OpenSearch from Tabularis. The project is under active development; the v0.1.0 specification is not yet fully implemented or validated. See the [specification](docs/specification.md), [implementation plan](docs/implementation-plan.md), and [ticket](docs/tickets/001-opensearch-driver-v0.1.0.md) for scope and acceptance criteria.
 
+The plugin icon uses the official OpenSearch brand mark hosted on GitHub and requires network access to display.
+
 ## Development
 
 Requirements: the Go version in `go.mod`, Node.js 20.19 or newer, npm, and Docker for real OpenSearch integration tests.

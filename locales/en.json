@@ -12,6 +12,9 @@
     "aws_static": "AWS access keys"
   },
   "endpoint": "Endpoint URL",
+  "endpoint_hint": "Enter the full HTTP or HTTPS endpoint.",
+  "advanced_settings": "Advanced settings",
+  "advanced_hint": "Index scope, pagination, and timeout",
   "region": "AWS region",
   "profile": "AWS profile name",
   "sso_hint": "SSO profiles require an active AWS login. Sign in again if the profile expires.",

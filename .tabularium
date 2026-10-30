@@ -5,6 +5,8 @@
   "min_runtime_version": "0.30.0",
   "kind": "driver",
   "engine": "opensearch",
+  "icon": "https://raw.githubusercontent.com/opensearch-project/project-website/0823cd8d19351def7f000f729b05b6a5f953e5cb/assets/brand/SVG/Mark/opensearch_mark_default.svg",
+  "color": "#005EB8",
   "paradigms": ["document", "search", "vector"],
   "description": "Browse and query OpenSearch indices from Tabularis.",
   "executable": "opensearch-plugin",
