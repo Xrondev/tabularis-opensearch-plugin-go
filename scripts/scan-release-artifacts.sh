@@ -13,7 +13,7 @@ mkdir "$scratch/tools" "$scratch/empty"
 GOBIN="$scratch/tools" go install github.com/zricethezav/gitleaks/v8@v8.30.1 >/dev/null 2>&1 || fail "scanner unavailable"
 scanner="$scratch/tools/gitleaks"
 scan() {
-  (cd "$scratch/empty" && env -u GITLEAKS_CONFIG -u GITLEAKS_CONFIG_TOML "$scanner" "$@" --no-banner --redact=100 --ignore-gitleaks-allow --gitleaks-ignore-path "$scratch/empty" >/dev/null 2>&1) || fail "secret scan failed or detected sensitive content"
+  (cd "$scratch/empty" && env -u GITLEAKS_CONFIG -u GITLEAKS_CONFIG_TOML "$scanner" "$@" --config "$root/scripts/artifact-gitleaks.toml" --no-banner --redact=100 --ignore-gitleaks-allow --gitleaks-ignore-path "$scratch/empty" >/dev/null 2>&1) || fail "secret scan failed or detected sensitive content"
 }
 
 case "$mode" in

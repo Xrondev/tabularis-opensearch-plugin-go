@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+regexTarget = "match"
+regexes = ['^credentials\tv1\.20\.9\th1:SNO55PnWhaDafsOcv16lCA0kdoFMl/YlegWoVsU02s0=$']
