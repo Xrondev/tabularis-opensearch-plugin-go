@@ -71,6 +71,8 @@ query() {
 id=$(connection offset)
 query "$id" 'SELECT * FROM "tabularis_host_fixture"' browse 1 10 | jq -e '.rows | length == 3' >/dev/null
 query "$id" 'SELECT * FROM "tabularis_host_fixture" WHERE "_source.count" >= 4 ORDER BY "_source.count" DESC' filter 1 10 | jq -e '[.rows[][4]] == [5,4]' >/dev/null
+dsl_query=$(printf '#!dsl\n{"index":"tabularis_host_fixture","body":{"size":0,"aggs":{"total":{"sum":{"field":"count"}}}}}')
+query "$id" "$dsl_query" aggregation 1 10 | jq -e '.columns == ["response"] and (.rows[0][0] | fromjson | .aggregations.total.value == 12)' >/dev/null
 ppl_query=$(printf '#!ppl\nsource=tabularis_host_fixture | fields count | sort count')
 query "$id" "$ppl_query" ppl 1 2 | jq -e '[.rows[][0]] == [3,4] and .truncated == true' >/dev/null
 pit=$(connection pit)

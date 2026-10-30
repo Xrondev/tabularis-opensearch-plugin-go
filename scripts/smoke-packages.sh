@@ -12,7 +12,7 @@ for label in linux-x64 linux-arm64 darwin-x64 darwin-arm64 win-x64; do
     shasum -a 256 -c "$archive.sha256"
   fi
   unzip -tq "$archive"
-  unzip -p "$archive" .tabularium | jq -e '.id == "opensearch" and .capabilities.readonly == true and .icon == "https://raw.githubusercontent.com/opensearch-project/project-website/0823cd8d19351def7f000f729b05b6a5f953e5cb/assets/brand/SVG/Mark/opensearch_mark_default.svg"' >/dev/null
+  unzip -p "$archive" .tabularium | jq -e '.id == "opensearch" and .capabilities.readonly == true and .color == "#737373" and .icon == "https://raw.githubusercontent.com/opensearch-project/project-website/0823cd8d19351def7f000f729b05b6a5f953e5cb/assets/brand/SVG/Mark/opensearch_mark_default.svg"' >/dev/null
   unzip -p "$archive" ui/dist/index.js >/dev/null
   unzip -p "$archive" ui/dist/raw-source.js >/dev/null
   unzip -p "$archive" ppl.bundle.js | shasum -a 256 | grep -F "$(cut -d' ' -f1 "$root/ppl/bundle.sha256")" >/dev/null
