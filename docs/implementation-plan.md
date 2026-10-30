@@ -14,7 +14,7 @@ Target OpenSearch 2.x and 3.x through an explicitly tested version matrix. Featu
 
 All database operations are read-oriented. Document/index mutations, administration, ingestion, provisioning, dashboards, and a custom query editor are outside v0.1.0. PIT creation/closure and query cursor closure are narrowly scoped transient-resource operations, not permission to mutate documents or configuration.
 
-Proposed identity: driver `opensearch`, executable `opensearch-plugin`, repository `tabularis-opensearch-plugin-go`, initial version `0.1.0`. Apache-2.0 remains a proposed licensing decision; confirm before adding the license and publishing. No deployment or formal data-source writes are authorized by this plan.
+Proposed identity: driver `opensearch`, executable `opensearch-plugin`, repository `tabularis-opensearch-plugin-go`, initial version `0.1.0`. The project is licensed under Apache-2.0. No deployment or formal data-source writes are authorized by this plan.
 
 ## 2. Evidence baseline
 
@@ -212,6 +212,6 @@ Docker is available locally (server 28.5.1), but no container or database was st
 - **Resource retention:** abrupt termination cannot guarantee immediate remote cleanup. Short bounded keep-alives, ownership tracking, TTL eviction and normal-close tests limit retention.
 - **Precision/structure:** Go and the host JavaScript UI have different numeric representations. Preserve original JSON and test values beyond JavaScript's exact integer range.
 - **AWS access:** local Docker cannot prove IAM signing, SSO refresh, managed-domain authorization, or Serverless policies. Required live evidence cannot be replaced with emulation.
-- **Release identity/license:** confirm owner, repository URLs and Apache-2.0 before publishing; verify third-party notices and generated-parser licensing.
+- **Release identity/license:** confirm owner and repository URLs before publishing; verify third-party notices and generated-parser licensing.
 
 Planning stop condition: this evidence-backed sequence and its acceptance gates are saved and reviewed. Implementation stop condition: all requested feature areas meet their test gates, release claims match recorded evidence, and any remaining platform limitations are explicit.

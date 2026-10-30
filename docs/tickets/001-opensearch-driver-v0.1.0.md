@@ -202,7 +202,7 @@ Independent UI and backend work may run in parallel after integration decisions 
 - [ ] Every supported platform package passes native installation, startup and basic host-query smoke tests.
 - [ ] ZIP contents, registry platform labels, executable permissions, checksums and manifest schema validation pass.
 - [ ] Tag, manifest and binary versions match `0.1.0` for the initial release.
-- [ ] Repository identity, publishing authority, Apache-2.0 selection and third-party notices are resolved before publication.
+- [ ] Repository identity, publishing authority and third-party notices are resolved before publication.
 - [ ] Documentation examples are tested against supported deployments or explicitly labeled unverified.
 - [ ] No requested feature or deployment is silently removed to complete the ticket.
 
@@ -216,7 +216,7 @@ Keep each blocker open until its evidence is attached:
 - **Host:** prove released-host mode handling, secret storage, sessions and result rendering. Any required host modification needs a separate scope decision.
 - **AWS:** obtain authorized endpoints and read-only access for live validation. Local emulation does not complete AWS acceptance.
 - **Backend operation:** record unsupported, unauthorized and unknown independently. State the exact affected deployment/query form.
-- **License/publishing:** confirm license and repository identity before creating a publishable release.
+- **License/publishing:** verify third-party notices and confirm repository identity before creating a publishable release.
 
 ## Completion evidence format
 

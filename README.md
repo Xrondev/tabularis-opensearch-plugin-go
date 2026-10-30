@@ -62,7 +62,11 @@ bash scripts/package.sh
 bash scripts/smoke-packages.sh
 ```
 
-Release publication requires the specification's compatibility, license, notice, version and platform-verification gates to be satisfied.
+Release publication requires the specification's compatibility, third-party notice, version and platform-verification gates to be satisfied.
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).
 
 ## Current query behavior
 

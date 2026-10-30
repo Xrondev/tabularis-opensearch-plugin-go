@@ -343,11 +343,18 @@ func (c *Client) Test(ctx context.Context) error {
 }
 
 func (c *Client) Tables(ctx context.Context) ([]Table, error) {
-	query := url.Values{"format": {"json"}, "h": {"index"}, "expand_wildcards": {"open"}}
+	query := url.Values{"format": {"json"}, "h": {"index"}}
+	endpoint := "/_cat/indices"
+	if c.config.Deployment != "aws_serverless" {
+		query.Set("expand_wildcards", "open")
+		endpoint += "/" + url.PathEscape(c.config.IndexPattern)
+	} else if _, err := matchesIndexPattern(c.config.IndexPattern, ""); err != nil {
+		return nil, err
+	}
 	var rows []struct {
 		Index string `json:"index"`
 	}
-	if err := c.get(ctx, "/_cat/indices/"+url.PathEscape(c.config.IndexPattern), query, &rows); err != nil {
+	if err := c.get(ctx, endpoint, query, &rows); err != nil {
 		return nil, err
 	}
 	tables := make([]Table, 0, len(rows))
@@ -355,10 +362,31 @@ func (c *Client) Tables(ctx context.Context) ([]Table, error) {
 		if row.Index == "" {
 			return nil, errors.New("index listing returned an empty name")
 		}
+		if c.config.Deployment == "aws_serverless" {
+			matches, err := matchesIndexPattern(c.config.IndexPattern, row.Index)
+			if err != nil {
+				return nil, err
+			}
+			if !matches {
+				continue
+			}
+		}
 		tables = append(tables, Table{Name: row.Index})
 	}
 	sort.Slice(tables, func(i, j int) bool { return tables[i].Name < tables[j].Name })
 	return tables, nil
+}
+
+func matchesIndexPattern(patterns, index string) (bool, error) {
+	matched := false
+	for _, pattern := range strings.Split(patterns, ",") {
+		match, err := path.Match(pattern, index)
+		if err != nil {
+			return false, errors.New("invalid index pattern")
+		}
+		matched = matched || match
+	}
+	return matched, nil
 }
 
 func (c *Client) Columns(ctx context.Context, index string) ([]Column, error) {

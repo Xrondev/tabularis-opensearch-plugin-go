@@ -344,7 +344,7 @@ Capability state is per connection generation and operation: supported, unsuppor
 
 ### RELEASE-01 — Manifest and identity
 
-Proposed driver ID `opensearch`, display name `OpenSearch`, executable `opensearch-plugin`, version `0.1.0`. Use canonical `.tabularium`, read-only/single-database capabilities and disabled relational mutation surfaces. Set minimum runtime version only after testing a released host. Apache-2.0 and public repository ownership require confirmation before publication.
+Proposed driver ID `opensearch`, display name `OpenSearch`, executable `opensearch-plugin`, version `0.1.0`. Use canonical `.tabularium`, read-only/single-database capabilities and disabled relational mutation surfaces. Set minimum runtime version only after testing a released host. The project is licensed under Apache-2.0; public repository ownership requires confirmation before publication.
 
 ### RELEASE-02 — Artifacts
 
@@ -385,6 +385,6 @@ Local integration uses project-scoped Docker resources and preloaded fixtures. F
 | G2 — Query safety and APIs | Maintained parser or reproducible upstream grammar generation, read-only classification, browse translation, exact operation registry, dependency versions/licenses and AWS signing tests. | Production query execution. |
 | G3 — Data semantics | Column/path encoding, large-number representation, mapping/filter semantics, aggregation display and alias preservation verified end to end. | Metadata/query acceptance. |
 | G4 — Resources | Pagination correctness and cleanup, concurrency/byte/TTL limits, retry and cancellation evidence. | Deep pagination and operational claims. |
-| G5 — Deployment/release | Live AWS matrix, platform smoke tests, license/owner confirmation, complete documentation and checksums. | Publication and support claims. |
+| G5 — Deployment/release | Live AWS matrix, platform smoke tests, third-party notices and owner confirmation, complete documentation and checksums. | Publication and support claims. |
 
 Implementation is complete when AT-01 through AT-12 pass for the declared support matrix, all gates are closed with evidence, and the ticket's definition of done is satisfied. Any required host modification, missing requested capability or untestable deployment claim is escalated as a specific scope/release decision.
