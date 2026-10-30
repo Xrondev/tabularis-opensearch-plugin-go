@@ -19,6 +19,7 @@ func TestArchiveValidation(t *testing.T) {
 		{"absolute", []string{"/README.md"}, false},
 		{"backslash", []string{"licenses\\secret"}, false},
 		{"duplicate", []string{"README.md", "README.md"}, false},
+		{"duplicate binary", []string{"opensearch-plugin", "opensearch-plugin.exe"}, false},
 		{"unexpected", []string{"credentials.json"}, false},
 	}
 	for _, tc := range cases {
